@@ -137,7 +137,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
           },
         );
       } else {
-        mostrarError("No se pudo registrar el usuario");
+        mostrarError("Usuario ya registrado");
       }
     } catch (e) {
       mostrarError("Error de conexión con el servidor");
