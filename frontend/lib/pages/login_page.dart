@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/config.dart';
 import '../pages/crear_usuario.dart';
+import '../utils/session_manager.dart';
+import '../pages/crear_servicio_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -40,13 +42,21 @@ class _LoginPageState extends State<LoginPage> {
           'contrasena': passController.text,
         }),
       );
-
+      //Validacion Login
       if (response.statusCode == 200) {
-        final usuario = jsonDecode(response.body);
-        setState(() {
-          mensaje = "Bienvenido, ${usuario['nombre']}";
-        });
-        // Aquí navegas a la pantalla principal
+        final data = jsonDecode(response.body);
+
+        SessionManager.iniciarSesion(
+          data['idUsuario'],
+          data['nombre'],
+          data['correo'],
+          data['idTipoUsuario'],
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const CrearServicioPage()),
+        );
       } else {
         setState(() {
           mensaje = "Correo o contraseña incorrectos";
