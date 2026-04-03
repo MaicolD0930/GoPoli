@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/config.dart';
 import '../utils/session_manager.dart';
+import '../pages/grupo_page.dart';
 
 class CrearServicioPage extends StatefulWidget {
   const CrearServicioPage({super.key});
@@ -116,7 +117,13 @@ class _CrearServicioPageState extends State<CrearServicioPage> {
       );
 
       if (res.statusCode == 200) {
-        setState(() => mensaje = "¡Servicio creado exitosamente!");
+        final data = jsonDecode(res.body);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GrupoPage(idServicio: data['idServicio']),
+          ),
+        );
       } else {
         setState(() => mensaje = res.body);
       }
