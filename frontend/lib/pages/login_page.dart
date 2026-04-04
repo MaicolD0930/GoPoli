@@ -4,7 +4,7 @@ import 'dart:convert';
 import '../config/config.dart';
 import '../pages/crear_usuario.dart';
 import '../utils/session_manager.dart';
-import '../pages/crear_servicio_page.dart';
+import '../pages/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -55,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const CrearServicioPage()),
+          MaterialPageRoute(builder: (_) => const HomePage()),
         );
       } else {
         setState(() {

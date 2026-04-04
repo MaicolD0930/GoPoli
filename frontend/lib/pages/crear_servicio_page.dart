@@ -22,6 +22,7 @@ class _CrearServicioPageState extends State<CrearServicioPage> {
   List ubicaciones = [];
   int? ubicacionSalidaSeleccionada;
   int? ubicacionLlegadaSeleccionada;
+  int capacidadSeleccionada = 2;
 
   DateTime? fechaSeleccionada;
   TimeOfDay? horaSeleccionada;
@@ -36,17 +37,13 @@ class _CrearServicioPageState extends State<CrearServicioPage> {
 
   Future<void> _cargarUbicaciones() async {
     try {
-      print("Llamando a ubicaciones..."); // línea nueva
       final res = await http.get(Uri.parse('${Config.apiUrl}/ubicaciones'));
-      print("Respuesta ubicaciones: ${res.body}");
-
       if (res.statusCode == 200) {
         setState(() {
           ubicaciones = jsonDecode(res.body);
         });
       }
     } catch (e) {
-      print("Error: $e"); // línea nueva
       setState(() => mensaje = "Error cargando ubicaciones");
     }
   }
@@ -113,6 +110,7 @@ class _CrearServicioPageState extends State<CrearServicioPage> {
           'horaSalida': horaStr,
           'idCreador': SessionManager.idUsuario,
           'idTipoServicio': 1,
+          'capacidad': capacidadSeleccionada,
         }),
       );
 
@@ -321,6 +319,49 @@ class _CrearServicioPageState extends State<CrearServicioPage> {
               controller: descripcionController,
               maxLines: 3,
               decoration: _inputDecoration(hint: 'Describe tu servicio...'),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Capacidad
+            const Text(
+              'Capacidad *',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: verdePrimario,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: capacidadSeleccionada > 2
+                      ? () => setState(() => capacidadSeleccionada--)
+                      : null,
+                  icon: const Icon(Icons.remove_circle_outline),
+                  color: verdePrimario,
+                  iconSize: 32,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    '$capacidadSeleccionada',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: capacidadSeleccionada < 4
+                      ? () => setState(() => capacidadSeleccionada++)
+                      : null,
+                  icon: const Icon(Icons.add_circle_outline),
+                  color: verdePrimario,
+                  iconSize: 32,
+                ),
+              ],
             ),
 
             const SizedBox(height: 32),
