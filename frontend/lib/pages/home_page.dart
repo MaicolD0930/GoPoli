@@ -8,7 +8,27 @@ import '../pages/grupo_page.dart';
 import '../pages/login_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({
+    super.key,
+    this.embedded = false,
+    this.onIrACrearServicio,
+    this.onIrAlInicio,
+    this.onIrAMapaViaje,
+    this.shellRefreshTick,
+  });
+
+  /// Dentro de [MainShell]: sin AppBar propio y FAB lleva al tab Inicio (mapa).
+  final bool embedded;
+
+  final VoidCallback? onIrACrearServicio;
+
+  /// Desde Buscar, botón pequeño para volver al tab mapa.
+  final VoidCallback? onIrAlInicio;
+
+  /// Tab Inicio: muestra la ruta del viaje en curso (creador o pasajero).
+  final void Function(int idServicio)? onIrAMapaViaje;
+
+  final ValueNotifier<int>? shellRefreshTick;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -17,7 +37,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   static const Color verdePrimario = Color(0xFF1B5E20);
   static const Color verdeSecundario = Color(0xFF2E7D32);
-  static const Color grisTexto = Color(0xFF757575);
 
   List servicios = [];
   bool cargando = true;
@@ -27,7 +46,23 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    widget.shellRefreshTick?.addListener(_onShellRefresh);
     _cargarTodo();
+  }
+
+  @override
+  void dispose() {
+    widget.shellRefreshTick?.removeListener(_onShellRefresh);
+    super.dispose();
+  }
+
+  void _onShellRefresh() {
+    _cargarTodo();
+  }
+
+  void _pingOtrasPestanas() {
+    final t = widget.shellRefreshTick;
+    if (t != null) t.value++;
   }
 
   Future<void> _cargarTodo() async {
@@ -41,18 +76,22 @@ class _HomePageState extends State<HomePage> {
       final res = await http.get(
         Uri.parse('${Config.apiUrl}/servicios/activos'),
       );
+      if (!mounted) return;
       if (res.statusCode == 200) {
         setState(() {
-          servicios = jsonDecode(res.body);
+          servicios = jsonDecode(res.body) as List<dynamic>;
           cargando = false;
         });
+      } else {
+        setState(() => cargando = false);
       }
     } catch (e) {
-      setState(() => cargando = false);
+      if (mounted) setState(() => cargando = false);
     }
   }
 
   Future<void> _verificarServicioActivo() async {
+    int? nuevo;
     try {
       var res = await http.get(
         Uri.parse(
@@ -60,26 +99,29 @@ class _HomePageState extends State<HomePage> {
         ),
       );
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() => idServicioActivo = data['idServicio']);
-        return;
-      }
-
-      res = await http.get(
-        Uri.parse(
-          '${Config.apiUrl}/servicio/usuario/miembro/${SessionManager.idUsuario}',
-        ),
-      );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() => idServicioActivo = data['idServicio']);
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final id = data['idServicio'];
+        if (id is num) nuevo = id.toInt();
+      } else {
+        res = await http.get(
+          Uri.parse(
+            '${Config.apiUrl}/servicio/usuario/miembro/${SessionManager.idUsuario}',
+          ),
+        );
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body) as Map<String, dynamic>;
+          final id = data['idServicio'];
+          if (id is num) nuevo = id.toInt();
+        }
       }
     } catch (e) {
-      // No tiene grupo activo
+      // Sin grupo activo o error de red
     }
+    if (mounted) setState(() => idServicioActivo = nuevo);
   }
 
   Future<void> _verificarServicioEnCurso() async {
+    int? nuevo;
     try {
       final res = await http.get(
         Uri.parse(
@@ -87,15 +129,19 @@ class _HomePageState extends State<HomePage> {
         ),
       );
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() => idServicioEnCurso = data['idServicio']);
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final id = data['idServicio'];
+        if (id is num) nuevo = id.toInt();
       }
     } catch (e) {
       // No tiene viaje en curso
     }
+    if (mounted) setState(() => idServicioEnCurso = nuevo);
   }
 
   Future<void> _unirse(int idServicio) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final res = await http.post(
         Uri.parse('${Config.apiUrl}/servicio/unirse'),
@@ -107,19 +153,23 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (res.statusCode == 200) {
-        Navigator.pushReplacement(
-          context,
+        if (!context.mounted) return;
+        await navigator.push<void>(
           MaterialPageRoute(builder: (_) => GrupoPage(idServicio: idServicio)),
         );
+        if (context.mounted) {
+          _cargarTodo();
+          _pingOtrasPestanas();
+        }
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(res.body)));
+        if (!context.mounted) return;
+        messenger.showSnackBar(SnackBar(content: Text(res.body)));
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error de conexión')));
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Error de conexión')),
+      );
     }
   }
 
@@ -127,68 +177,64 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'GoPoli',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        backgroundColor: verdePrimario,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            onPressed: () {
-              SessionManager.cerrarSesion();
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-              );
-            },
-            icon: const Icon(Icons.logout, color: Colors.white),
-          ),
-        ],
-      ),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: const Text(
+                'GoPoli',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
+              backgroundColor: verdePrimario,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  onPressed: () {
+                    SessionManager.cerrarSesion();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    );
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                ),
+              ],
+            ),
       body: Column(
         children: [
           // Banner viaje en curso
           if (idServicioEnCurso != null)
-            GestureDetector(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GrupoPage(idServicio: idServicioEnCurso!),
+            Material(
+              color: const Color(0xFF2E7D32),
+              child: InkWell(
+                onTap: () =>
+                    widget.onIrAMapaViaje?.call(idServicioEnCurso!),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
-                );
-                _cargarTodo();
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                color: const Color(0xFF2E7D32),
-                child: Row(
-                  children: const [
-                    Icon(Icons.directions_car, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Tienes un viaje en curso — Toca para ver',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.map, color: Colors.white, size: 22),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Viaje en curso — Ver ruta en el mapa (Inicio)',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                    ),
-                    Icon(Icons.chevron_right, color: Colors.white),
-                  ],
+                      Icon(Icons.north_east, color: Colors.white, size: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -198,38 +244,63 @@ class _HomePageState extends State<HomePage> {
             child: cargando
                 ? const Center(child: CircularProgressIndicator())
                 : servicios.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.group_off,
-                          size: 64,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No hay servicios activos',
-                          style: TextStyle(
-                            color: Color(0xFF757575),
-                            fontSize: 16,
+                ? RefreshIndicator(
+                    color: verdePrimario,
+                    onRefresh: _cargarTodo,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.group_off,
+                                    size: 64,
+                                    color: Colors.grey[300],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'No hay servicios activos',
+                                    style: TextStyle(
+                                      color: Color(0xFF757575),
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    '¡Crea el primero!',
+                                    style: TextStyle(
+                                      color: Color(0xFF757575),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Desliza hacia abajo para actualizar',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          '¡Crea el primero!',
-                          style: TextStyle(
-                            color: Color(0xFF757575),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   )
                 : RefreshIndicator(
-                    onRefresh: _cargarServicios,
+                    onRefresh: _cargarTodo,
                     color: verdePrimario,
                     child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
                       itemCount: servicios.length,
                       itemBuilder: (context, index) {
@@ -299,47 +370,105 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      floatingActionButton: idServicioEnCurso != null
-          ? null
-          : idServicioActivo != null
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GrupoPage(idServicio: idServicioActivo!),
-                  ),
-                );
-                _cargarTodo();
-              },
-              backgroundColor: verdeSecundario,
-              icon: const Icon(Icons.group, color: Colors.white),
-              label: const Text(
-                'Ver mi Grupo',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
+      floatingActionButton: _buildFab(),
+    );
+  }
+
+  Widget? _buildFab() {
+    void irInicio() {
+      final cb = widget.onIrAlInicio ?? widget.onIrACrearServicio;
+      cb?.call();
+    }
+
+    if (idServicioEnCurso != null) {
+      return FloatingActionButton.extended(
+        heroTag: 'fab_viaje_curso',
+        onPressed: () =>
+            widget.onIrAMapaViaje?.call(idServicioEnCurso!),
+        backgroundColor: verdeSecundario,
+        icon: const Icon(Icons.map, color: Colors.white),
+        label: const Text(
+          'Ver ruta del viaje',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    if (idServicioActivo != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'fab_grupo',
+            onPressed: () async {
+              if (!context.mounted) return;
+              await Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GrupoPage(idServicio: idServicioActivo!),
                 ),
-              ),
-            )
-          : FloatingActionButton.extended(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CrearServicioPage()),
-                );
+              );
+              if (mounted) {
                 _cargarTodo();
-              },
-              backgroundColor: verdePrimario,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Crear Servicio',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+                _pingOtrasPestanas();
+              }
+            },
+            backgroundColor: verdeSecundario,
+            icon: const Icon(Icons.group, color: Colors.white),
+            label: const Text(
+              'Ver mi grupo',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+          if (widget.embedded &&
+              (widget.onIrAlInicio != null ||
+                  widget.onIrACrearServicio != null)) ...[
+            const SizedBox(height: 12),
+            FloatingActionButton.small(
+              heroTag: 'fab_mapa',
+              tooltip: 'Ir al mapa (inicio)',
+              onPressed: irInicio,
+              backgroundColor: verdePrimario,
+              child: const Icon(Icons.map, color: Colors.white),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return FloatingActionButton.extended(
+      heroTag: 'fab_crear',
+      onPressed: () async {
+        if (widget.embedded && widget.onIrACrearServicio != null) {
+          widget.onIrACrearServicio!();
+          return;
+        }
+        if (!context.mounted) return;
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => const CrearServicioPage()),
+        );
+        if (mounted) {
+          _cargarTodo();
+          _pingOtrasPestanas();
+        }
+      },
+      backgroundColor: verdePrimario,
+      icon: const Icon(Icons.add, color: Colors.white),
+      label: const Text(
+        'Crear servicio',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

@@ -5,15 +5,19 @@ class SessionManager {
   static int? idTipoUsuario;
 
   static void iniciarSesion(
-    int id,
+    dynamic idUsuarioRaw,
     String nombreUsuario,
     String correoUsuario,
-    int tipoUsuario,
+    dynamic tipoUsuarioRaw,
   ) {
-    idUsuario = id;
+    idUsuario = idUsuarioRaw is num
+        ? idUsuarioRaw.toInt()
+        : int.tryParse(idUsuarioRaw.toString());
     nombre = nombreUsuario;
     correo = correoUsuario;
-    idTipoUsuario = tipoUsuario;
+    idTipoUsuario = tipoUsuarioRaw is num
+        ? tipoUsuarioRaw.toInt()
+        : int.tryParse(tipoUsuarioRaw.toString());
   }
 
   static void cerrarSesion() {
@@ -21,5 +25,16 @@ class SessionManager {
     nombre = null;
     correo = null;
     idTipoUsuario = null;
+  }
+
+  /// Etiqueta legible según [idTipoUsuario] del backend (1 = pasajero por defecto al registrar).
+  static String etiquetaTipoUsuario() {
+    switch (idTipoUsuario) {
+      case 2:
+        return 'Chofer';
+      case 1:
+      default:
+        return 'Pasajero';
+    }
   }
 }

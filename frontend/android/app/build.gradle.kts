@@ -1,9 +1,26 @@
+import java.io.File
+import java.util.regex.Pattern
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Lee la clave de Google Maps desde lib/config/google_maps_config.dart (un solo lugar).
+fun extractGoogleMapsKey(flutterProjectRoot: File): String {
+    val f = File(flutterProjectRoot, "lib/config/google_maps_config.dart")
+    if (!f.exists()) return ""
+    val text = f.readText()
+    val m = Pattern.compile(
+        """const\s+String\s+kGoogleMapsApiKey\s*=\s*['"]([^'"]*)['"]\s*;"""
+    ).matcher(text)
+    return if (m.find()) m.group(1)?.trim() ?: "" else ""
+}
+
+val flutterProjectRoot: File = rootProject.projectDir.parentFile
+val googleMapsKeyFromDart: String = extractGoogleMapsKey(flutterProjectRoot)
 
 android {
     namespace = "com.example.gopoli"
@@ -28,6 +45,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_KEY"] = googleMapsKeyFromDart
     }
 
     buildTypes {
