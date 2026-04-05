@@ -4,7 +4,7 @@ import 'dart:convert';
 import '../config/config.dart';
 import '../pages/crear_usuario.dart';
 import '../utils/session_manager.dart';
-import '../pages/home_page.dart';
+import '../pages/main_shell.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -33,6 +33,8 @@ class _LoginPageState extends State<LoginPage> {
       mensaje = "";
     });
 
+    final navigator = Navigator.of(context);
+
     try {
       final response = await http.post(
         Uri.parse('${Config.apiUrl}/login'),
@@ -53,9 +55,9 @@ class _LoginPageState extends State<LoginPage> {
           data['idTipoUsuario'],
         );
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
+        if (!context.mounted) return;
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainShell()),
         );
       } else {
         setState(() {
@@ -295,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
                     'https://www.google.com/favicon.ico',
                     width: 20,
                     height: 20,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.g_mobiledata,
                       color: Colors.blue,
                       size: 24,

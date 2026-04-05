@@ -23,6 +23,9 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
+# Clave de Google Maps (local; no subir). Copia desde google_maps_config.example.dart
+lib/config/google_maps_config.dart
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
