@@ -36,12 +36,14 @@ class _LoginPageState extends State<LoginPage> {
     final navigator = Navigator.of(context);
 
     try {
+      final correo = correoController.text.trim();
+      final contrasena = passController.text;
       final response = await http.post(
         Uri.parse('${Config.apiUrl}/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'correo': correoController.text,
-          'contrasena': passController.text,
+          'correo': correo,
+          'contrasena': contrasena,
         }),
       );
       //Validacion Login
@@ -60,16 +62,21 @@ class _LoginPageState extends State<LoginPage> {
           MaterialPageRoute(builder: (_) => const MainShell()),
         );
       } else {
+        if (!mounted) return;
         setState(() {
-          mensaje = "Correo o contraseña incorrectos";
+          final body = response.body.trim();
+          mensaje = body.isNotEmpty ? body : "Correo o contraseña incorrectos";
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        mensaje = "Error de conexión";
+        mensaje = "Error de conexión con ${Config.apiUrl}";
       });
     } finally {
-      setState(() => cargando = false);
+      if (mounted) {
+        setState(() => cargando = false);
+      }
     }
   }
 
