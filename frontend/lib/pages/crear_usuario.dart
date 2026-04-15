@@ -51,27 +51,27 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
     String nombre = nombreController.text;
     String documento = documentoController.text;
 
-    if (!validaciones.correoInstitucional(correo)) {
+    if (!Validaciones.correoInstitucional(correo)) {
       mostrarError("El correo debe ser @elpoli.edu.co");
       return false;
     }
 
-    if (!validaciones.contrasenaValida(pass)) {
+    if (!Validaciones.contrasenaValida(pass)) {
       mostrarError("La contraseña debe tener mínimo 8 caracteres");
       return false;
     }
 
-    if (!validaciones.nombreValido(nombre)) {
+    if (!Validaciones.nombreValido(nombre)) {
       mostrarError("El nombre solo puede contener letras");
       return false;
     }
 
-    if (!validaciones.documentoValido(documento)) {
+    if (!Validaciones.documentoValido(documento)) {
       mostrarError("El documento solo puede contener números");
       return false;
     }
 
-    if (!validaciones.telefonoValido(telController.text)) {
+    if (!Validaciones.telefonoValido(telController.text)) {
       mostrarError("El teléfono debe tener entre 8 y 14 dígitos");
       return false;
     }
@@ -234,7 +234,7 @@ class _CrearUsuarioPageState extends State<CrearUsuarioPage> {
                     prefixIcon: Icon(Icons.school),
                   ),
                   hint: const Text("Seleccionar Carrera"),
-                  value: carreraSeleccionada,
+                  initialValue: carreraSeleccionada,
                   items: carreras.map<DropdownMenuItem<int>>((c) {
                     return DropdownMenuItem<int>(
                       value: c["idCarrera"],

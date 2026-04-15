@@ -330,7 +330,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(
-          value: ubicacionSalidaSeleccionada,
+          initialValue: ubicacionSalidaSeleccionada,
           hint: const Text('Desde dónde sales'),
           decoration: _inputDecoration(),
           items: ubicaciones
@@ -360,7 +360,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
         const SizedBox(height: 8),
         ?sugerencias,
         DropdownButtonFormField<int>(
-          value: ubicacionLlegadaSeleccionada,
+          initialValue: ubicacionLlegadaSeleccionada,
           hint: const Text('¿A dónde vamos?'),
           decoration: _inputDecoration(),
           items: ubicaciones

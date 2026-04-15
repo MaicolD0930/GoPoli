@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
 import '../config/config.dart';
 import '../utils/session_manager.dart';
@@ -13,14 +14,16 @@ class GrupoPage extends StatefulWidget {
   State<GrupoPage> createState() => _GrupoPageState();
 }
 
-class _GrupoPageState extends State<GrupoPage> {
+class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
   static const Color verdePrimario = Color(0xFF1B5E20);
   static const Color grisTexto = Color(0xFF757575);
+  static const Duration _intervaloAutoRefresh = Duration(seconds: 5);
 
   List<dynamic> miembros = [];
   bool cargando = true;
   int estadoServicio = 1;
   String? _errorMiembros;
+  Timer? _timerAutoRefresh;
 
   /// Evita fallos al comparar idUsuario del JSON (int/num) con la sesión.
   static bool _mismoUsuario(dynamic idJson, int? idSesion) {
@@ -39,15 +42,52 @@ class _GrupoPageState extends State<GrupoPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _cargarTodo();
+    _iniciarAutoRefresh();
   }
 
-  Future<void> _cargarTodo() async {
-    await Future.wait([_cargarMiembros(), _cargarEstadoServicio()]);
+  @override
+  void dispose() {
+    _timerAutoRefresh?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
-  Future<void> _cargarMiembros({bool esReintento = false}) async {
-    if (!esReintento && mounted) {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _iniciarAutoRefresh();
+      _cargarTodo(mostrarCarga: false);
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _timerAutoRefresh?.cancel();
+    }
+  }
+
+  void _iniciarAutoRefresh() {
+    _timerAutoRefresh?.cancel();
+    _timerAutoRefresh = Timer.periodic(_intervaloAutoRefresh, (_) {
+      if (!mounted) return;
+      _cargarTodo(mostrarCarga: false);
+    });
+  }
+
+  Future<void> _cargarTodo({bool mostrarCarga = true}) async {
+    await Future.wait([
+      _cargarMiembros(mostrarCarga: mostrarCarga),
+      _cargarEstadoServicio(),
+    ]);
+  }
+
+  Future<void> _cargarMiembros({
+    bool esReintento = false,
+    bool mostrarCarga = true,
+  }) async {
+    if (!esReintento && mostrarCarga && mounted) {
       setState(() {
         cargando = true;
         _errorMiembros = null;
@@ -64,7 +104,7 @@ class _GrupoPageState extends State<GrupoPage> {
         // A veces el GET llega antes de que el miembro creador esté visible; un reintento breve ayuda.
         if (list.isEmpty && !esReintento) {
           await Future<void>.delayed(const Duration(milliseconds: 450));
-          await _cargarMiembros(esReintento: true);
+          await _cargarMiembros(esReintento: true, mostrarCarga: mostrarCarga);
           return;
         }
         setState(() {
@@ -363,7 +403,7 @@ class _GrupoPageState extends State<GrupoPage> {
     if (miembros.isEmpty) {
       return RefreshIndicator(
         color: verdePrimario,
-        onRefresh: _cargarTodo,
+        onRefresh: () => _cargarTodo(),
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
@@ -406,7 +446,7 @@ class _GrupoPageState extends State<GrupoPage> {
 
     return RefreshIndicator(
       color: verdePrimario,
-      onRefresh: _cargarTodo,
+      onRefresh: () => _cargarTodo(),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),

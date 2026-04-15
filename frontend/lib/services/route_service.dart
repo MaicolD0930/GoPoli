@@ -10,8 +10,11 @@ class RouteService {
       return [origen, destino];
     }
     try {
+      // TODO: migrar a la API nueva de flutter_polyline_points.
+      // ignore: deprecated_member_use
       final poly = PolylinePoints.legacy(key);
       final res = await poly.getRouteBetweenCoordinates(
+        // ignore: deprecated_member_use
         request: PolylineRequest(
           origin: PointLatLng(origen.latitude, origen.longitude),
           destination: PointLatLng(destino.latitude, destino.longitude),

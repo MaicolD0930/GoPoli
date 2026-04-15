@@ -1,4 +1,4 @@
-class validaciones {
+class Validaciones {
   static bool correoInstitucional(String correo) {
     return correo.trim().endsWith("@elpoli.edu.co");
   }
