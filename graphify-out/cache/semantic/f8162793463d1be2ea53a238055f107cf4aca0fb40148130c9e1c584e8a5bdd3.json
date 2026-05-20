@@ -1,0 +1,1 @@
+{"nodes": [{"id": "frontend_readme_maps_es", "label": "Google Maps API Guide", "file_type": "document", "source_file": "frontend/README_MAPS_ES.md"}], "edges": [{"source": "frontend_readme_maps_es", "target": "frontend_google_maps_config", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "frontend/README_MAPS_ES.md"}], "hyperedges": []}

@@ -1,0 +1,1 @@
+{"nodes": [], "edges": [{"source": "frontend_pubspec", "target": "backend_spring_boot", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "frontend/README.md"}], "hyperedges": []}

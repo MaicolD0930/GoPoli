@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+
+import '../core/api_exception.dart';
+import '../models/usuario.dart';
+import '../services/usuario_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/session_manager.dart';
+import '../widgets/profile_avatar.dart';
+import 'bienvenida_page.dart';
+import 'editar_perfil_page.dart';
 import 'login_page.dart';
 
+/// DEV-10 / HU-04 — Ver perfil (+ acciones HU-05 y HU-06).
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key, this.embedded = false});
 
@@ -12,24 +21,166 @@ class PerfilPage extends StatefulWidget {
 }
 
 class _PerfilPageState extends State<PerfilPage> {
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-  static const Color amarillo = Color(0xFFFFC107);
-  static const Color grisTexto = Color(0xFF757575);
-  static const Color grisClaro = Color(0xFFF5F5F5);
+  final _usuarioService = const UsuarioService();
+  Usuario? _usuario;
+  bool _cargando = true;
+  String? _error;
 
-  void _cerrarSesion() {
-    SessionManager.cerrarSesion();
+  @override
+  void initState() {
+    super.initState();
+    _cargarPerfil();
+  }
+
+  Future<void> _cargarPerfil() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      final u = await _usuarioService.obtenerPerfil();
+      if (!mounted) return;
+      setState(() {
+        _usuario = u;
+        _cargando = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _cargando = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No se pudo cargar el perfil';
+        _cargando = false;
+      });
+    }
+  }
+
+  Future<void> _irAEditar() async {
+    if (_usuario == null) return;
+    final actualizado = await Navigator.push<Usuario>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditarPerfilPage(usuarioInicial: _usuario!),
+      ),
+    );
+    if (actualizado != null) {
+      setState(() => _usuario = actualizado);
+    } else {
+      await _cargarPerfil();
+    }
+  }
+
+  Future<void> _cerrarSesion() async {
+    await SessionManager.cerrarSesion();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
+      (_) => false,
+    );
+  }
+
+  Future<void> _inhabilitarCuenta() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Inhabilitar cuenta'),
+        content: const Text(
+          'Tu cuenta quedará desactivada y no podrás iniciar sesión. '
+          '¿Deseas continuar?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Inhabilitar', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      await _usuarioService.inhabilitarCuenta();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (_) => false,
+      );
+    } on ApiException catch (e) {
+      _mostrarSnack(e.message);
+    } catch (_) {
+      _mostrarSnack('Error al inhabilitar la cuenta');
+    }
+  }
+
+  Future<void> _eliminarCuenta() async {
+    final paso1 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: const Text(
+          'Esta acción es permanente. Se borrarán tus datos y no podrás recuperarlos.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (paso1 != true || !mounted) return;
+
+    final paso2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Estás seguro?'),
+        content: const Text(
+          'Confirma que deseas eliminar tu cuenta de forma definitiva.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (paso2 != true || !mounted) return;
+
+    try {
+      await _usuarioService.eliminarCuenta();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const BienvenidaPage()),
+        (_) => false,
+      );
+    } on ApiException catch (e) {
+      _mostrarSnack(e.message);
+    } catch (_) {
+      _mostrarSnack('Error al eliminar la cuenta');
+    }
+  }
+
+  void _mostrarSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final nombre = SessionManager.nombre ?? 'Usuario';
-    final correo = SessionManager.correo ?? '';
-    final rolTexto = SessionManager.etiquetaTipoUsuario();
+    final u = _usuario;
+    final nombre = u?.nombre ?? SessionManager.nombre ?? 'Usuario';
+    final correo = u?.correo ?? SessionManager.correo ?? '';
+    final foto = u?.fotoPerfil ?? SessionManager.fotoPerfil;
+    final nota = u?.nota ?? SessionManager.nota;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -38,119 +189,155 @@ class _PerfilPageState extends State<PerfilPage> {
           : AppBar(
               backgroundColor: Colors.white,
               elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
-                onPressed: () => Navigator.pop(context),
-              ),
-              centerTitle: true,
+              foregroundColor: Colors.black,
               title: const Text(
                 'Mi perfil',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
               ),
+              actions: [
+                if (!_cargando && _error == null)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: _irAEditar,
+                    tooltip: 'Editar perfil',
+                  ),
+              ],
             ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Column(
-                children: [
-                  SizedBox(height: widget.embedded ? 8 : 16),
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFFE0B2),
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+      body: _cargando
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.verdePrimario),
+            )
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _cargarPerfil,
+                          child: const Text('Reintentar'),
                         ),
                       ],
                     ),
-                    child: const ClipOval(
-                      child: Icon(
-                        Icons.person,
-                        size: 70,
-                        color: Color(0xFFBCAAA4),
-                      ),
-                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    nombre,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    correo.isEmpty ? 'Sin correo' : correo,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: verdeSecundario,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: grisClaro,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'Rol: $rolTexto',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: grisTexto,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _cerrarSesion,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: amarillo,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Cerrar sesión',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                )
+              : RefreshIndicator(
+                  onRefresh: _cargarPerfil,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      children: [
+                        if (widget.embedded)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, right: 8),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: const Icon(Icons.edit, color: AppColors.verdePrimario),
+                                onPressed: _irAEditar,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                        ProfileAvatar(fotoBase64: foto, radius: 50),
+                        const SizedBox(height: 12),
+                        Text(
+                          nombre,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          correo.isEmpty ? 'Sin correo' : correo,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.verdeSecundario,
+                          ),
+                        ),
+                        if (u?.tel != null && u!.tel!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            u.tel!,
+                            style: const TextStyle(color: AppColors.grisTexto),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        RatingBadge(nota: nota),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Rol: ${SessionManager.etiquetaTipoUsuario()}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.grisTexto,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        _boton(
+                          label: 'Editar perfil',
+                          color: AppColors.verdePrimario,
+                          onPressed: _irAEditar,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Cerrar sesión',
+                          color: AppColors.amarillo,
+                          onPressed: _cerrarSesion,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Inhabilitar cuenta',
+                          color: Colors.orange,
+                          onPressed: _inhabilitarCuenta,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Eliminar cuenta',
+                          color: Colors.red.shade700,
+                          onPressed: _eliminarCuenta,
+                        ),
+                        const SizedBox(height: 32),
+                      ],
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
+    );
+  }
+
+  Widget _boton({
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
       ),
     );
