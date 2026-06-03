@@ -8,7 +8,9 @@ import '../utils/session_manager.dart';
 import '../widgets/profile_avatar.dart';
 import 'bienvenida_page.dart';
 import 'editar_perfil_page.dart';
+import 'historial_viajes_page.dart';
 import 'login_page.dart';
+import 'registro_conductor_page.dart';
 
 /// DEV-10 / HU-04 — Ver perfil (+ acciones HU-05 y HU-06).
 class PerfilPage extends StatefulWidget {
@@ -39,6 +41,7 @@ class _PerfilPageState extends State<PerfilPage> {
     });
     try {
       final u = await _usuarioService.obtenerPerfil();
+      await SessionManager.actualizarUsuario(u);
       if (!mounted) return;
       setState(() {
         _usuario = u;
@@ -168,9 +171,68 @@ class _PerfilPageState extends State<PerfilPage> {
     }
   }
 
-  void _mostrarSnack(String msg) {
+  void _mostrarSnack(String msg, {Color? color}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color ?? Colors.red.shade700,
+      ),
+    );
+  }
+
+  bool get _esConductor =>
+      _usuario?.isDriver == true || SessionManager.esConductor;
+
+  Future<void> _irRegistroConductor() async {
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const RegistroConductorPage()),
+    );
+    if (ok == true) await _cargarPerfil();
+  }
+
+  Future<void> _dejarConductor() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dejar la Chamba'),
+        content: const Text(
+          'Dejarás de ser conductor y volverás a usuario pasajero. '
+          'Tu vehículo registrado se eliminará.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+
+    try {
+      await _usuarioService.unregisterAsDriver();
+      if (!mounted) return;
+      _mostrarSnack(
+        'Ya no eres conductor. Sigues como pasajero.',
+        color: AppColors.verdePrimario,
+      );
+      await _cargarPerfil();
+    } on ApiException catch (e) {
+      _mostrarSnack(e.message);
+    } catch (_) {
+      _mostrarSnack('No se pudo completar la acción');
+    }
+  }
+
+  void _irHistorial() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HistorialViajesPage()),
     );
   }
 
@@ -287,7 +349,33 @@ class _PerfilPageState extends State<PerfilPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        if (u?.vehiculo != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${u!.vehiculo!.marca} ${u.vehiculo!.modelo} · ${u.vehiculo!.color} · ${u.vehiculo!.placa}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.grisTexto,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        if (!_esConductor)
+                          _bannerConductor()
+                        else
+                          _boton(
+                            label: 'Dejar la Chamba',
+                            color: const Color(0xFF5D4037),
+                            onPressed: _dejarConductor,
+                          ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Historial de viajes',
+                          color: const Color(0xFF1565C0),
+                          onPressed: _irHistorial,
+                        ),
+                        const SizedBox(height: 12),
                         _boton(
                           label: 'Editar perfil',
                           color: AppColors.verdePrimario,
@@ -316,6 +404,39 @@ class _PerfilPageState extends State<PerfilPage> {
                     ),
                   ),
                 ),
+    );
+  }
+
+  Widget _bannerConductor() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Material(
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: _irRegistroConductor,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.directions_car, color: AppColors.verdePrimario),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    '¿Quieres ser parte nuestra?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.verdePrimario,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.green.shade800),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

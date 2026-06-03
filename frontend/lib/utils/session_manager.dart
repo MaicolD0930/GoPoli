@@ -24,6 +24,8 @@ class SessionManager {
   static bool get haySesion =>
       token != null && token!.isNotEmpty && idUsuario != null;
 
+  static bool get esConductor => idTipoUsuario == 2;
+
   static Future<void> iniciarSesion(LoginSessionData data) async {
     token = data.token;
     idUsuario = data.usuario.idUsuario;
@@ -53,6 +55,10 @@ class SessionManager {
     correo = u.correo;
     nota = u.nota;
     fotoPerfil = u.fotoPerfil;
+    if (u.idTipoUsuario != null) {
+      idTipoUsuario = u.idTipoUsuario;
+      await _storage.write(key: _keyTipo, value: idTipoUsuario.toString());
+    }
     await _storage.write(key: _keyNombre, value: nombre);
     await _storage.write(key: _keyCorreo, value: correo);
     if (nota != null) {
@@ -94,13 +100,8 @@ class SessionManager {
   }
 
   static String etiquetaTipoUsuario() {
-    switch (idTipoUsuario) {
-      case 2:
-        return 'Chofer';
-      case 1:
-      default:
-        return 'Pasajero';
-    }
+    if (esConductor) return 'Conductor';
+    return 'Pasajero';
   }
 }
 
