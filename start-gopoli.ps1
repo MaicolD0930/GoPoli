@@ -1,4 +1,5 @@
-# Inicia PostgreSQL (Docker), backend Spring Boot y frontend Flutter.
+# Inicia backend Spring Boot y frontend Flutter.
+# Por defecto usa backend/.env (Neon) si existe; si no, PostgreSQL local en Docker.
 #
 # Si PowerShell bloquea scripts, NO ejecutes este archivo directo.
 # Usa una de estas opciones:
@@ -13,7 +14,13 @@ param(
     [string]$Browser = 'chrome',
 
     [switch]$SkipDocker,
-    [switch]$SkipDbRestore
+    [switch]$SkipDbRestore,
+
+    # Forzar BD local en Docker (ignora backend/.env de Neon)
+    [switch]$UseLocalDb,
+
+    # Ventana del navegador ~ tamano iPhone (vista celular en Chrome/Opera)
+    [switch]$MobileView
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +30,8 @@ $FrontendDir = Join-Path $RepoRoot 'frontend'
 $ApiUrl = 'http://localhost:8080'
 $DbPort = 5433
 $DockerName = 'gopoli-postgres'
+$LoadEnvScript = Join-Path $RepoRoot 'scripts\Load-BackendEnv.ps1'
+. $LoadEnvScript
 
 function Write-Step {
     param([string]$Tag, [string]$Message, [string]$Color = 'White')
@@ -121,6 +130,8 @@ function Start-PostgresDocker {
 }
 
 function Start-BackendWindow {
+    param([bool]$UseNeon)
+
     if (Test-BackendReady) {
         Write-Step 'API' "Backend ya responde en $ApiUrl" 'Green'
         return
@@ -132,15 +143,37 @@ function Start-BackendWindow {
         New-Item -ItemType Directory -Path $runnerDir -Force | Out-Null
     }
 
-    @"
-`$host.UI.RawUI.WindowTitle = 'GoPoli Backend'
+    if ($UseNeon) {
+        if (-not (Test-BackendEnvReady -BackendDir $BackendDir)) {
+            throw @"
+backend/.env incompleto para Neon.
+1. Abre Neon -> Connect -> copia la contraseña de neondb_owner
+2. Edita backend/.env y reemplaza cambiar_por_password_neon
+"@
+        }
+        Import-BackendEnv -BackendDir $BackendDir | Out-Null
+        $dbLabel = Get-BackendDbLabel
+        @"
+`$host.UI.RawUI.WindowTitle = 'GoPoli Backend (Neon)'
+. '$LoadEnvScript'
+Import-BackendEnv -BackendDir '$BackendDir' | Out-Null
+Write-Host 'BD: $dbLabel' -ForegroundColor Green
+Write-Host 'Iniciando Spring Boot en $ApiUrl ...' -ForegroundColor Cyan
+Set-Location -LiteralPath '$BackendDir'
+& .\mvnw.cmd spring-boot:run
+"@ | Set-Content -Path $runnerScript -Encoding UTF8
+    } else {
+        @"
+`$host.UI.RawUI.WindowTitle = 'GoPoli Backend (local)'
 Set-Location -LiteralPath '$BackendDir'
 `$env:SPRING_DATASOURCE_URL = 'jdbc:postgresql://localhost:$DbPort/gopoli'
 `$env:SPRING_DATASOURCE_USERNAME = 'postgres'
 `$env:SPRING_DATASOURCE_PASSWORD = '123456789'
+Write-Host 'BD: PostgreSQL local (Docker puerto $DbPort)' -ForegroundColor Yellow
 Write-Host 'Iniciando Spring Boot en $ApiUrl ...' -ForegroundColor Cyan
 & .\mvnw.cmd spring-boot:run
 "@ | Set-Content -Path $runnerScript -Encoding UTF8
+    }
 
     Start-Process powershell -ArgumentList @(
         '-NoExit',
@@ -168,6 +201,13 @@ function Ensure-FrontendConfig {
         Copy-Item $mapsExample $mapsConfig
         Write-Step 'APP' 'Creado google_maps_config.dart. Agrega tu clave de Google Maps.' 'Yellow'
     }
+    $syncScript = Join-Path $RepoRoot 'scripts\Sync-GoogleMapsKey.ps1'
+    if (Test-Path $syncScript) {
+        . $syncScript
+        if (Sync-GoogleMapsKey) {
+            Write-Step 'APP' 'Clave Maps sincronizada a web/index.html' 'Green'
+        }
+    }
 }
 
 # --- Main ---
@@ -177,11 +217,22 @@ Write-Host "Navegador: $Browser"
 Write-Host ''
 
 try {
+    $useNeon = (-not $UseLocalDb) -and (Test-BackendEnvReady -BackendDir $BackendDir)
+    if ($useNeon) {
+        Write-Step 'DB' (Get-BackendDbLabel) 'Green'
+        Write-Step 'DB' 'Rama Neon puede estar archivada; al conectar se reactiva sola.' 'Cyan'
+        $SkipDocker = $true
+    } elseif (-not $UseLocalDb -and (Test-Path (Join-Path $BackendDir '.env'))) {
+        throw 'backend/.env existe pero falta la contraseña de Neon. Edita SPRING_DATASOURCE_PASSWORD.'
+    } else {
+        Write-Step 'DB' 'Sin backend/.env valido: usando PostgreSQL local (Docker).' 'Yellow'
+    }
+
     if (-not $SkipDocker) {
         Start-PostgresDocker
     }
 
-    Start-BackendWindow
+    Start-BackendWindow -UseNeon:$useNeon
     Ensure-FrontendConfig
 
     $flutter = Resolve-Flutter
@@ -195,6 +246,7 @@ try {
     Write-Step 'APP' "API: $ApiUrl"
 
     Set-Location $FrontendDir
+    & $flutter config --enable-web 2>&1 | Out-Null
 
     $pubResult = & $flutter pub get 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -206,7 +258,32 @@ try {
         throw 'flutter pub get fallo.'
     }
 
-    & $flutter run -d chrome --dart-define=API_URL=$ApiUrl
+    $deviceList = & $flutter devices 2>&1 | Out-String
+    $flutterDevice = 'chrome'
+    if ($deviceList -notmatch '\bchrome\b') {
+        if ($deviceList -match '\bedge\b') {
+            $flutterDevice = 'edge'
+            Write-Step 'APP' 'Chrome no detectado; usando Microsoft Edge.' 'Yellow'
+        } else {
+            throw 'No hay navegador web para Flutter (chrome ni edge). Instala Chrome o Edge.'
+        }
+    }
+
+    $flutterArgs = @(
+        'run',
+        '-d', $flutterDevice,
+        '--dart-define=API_URL=' + $ApiUrl
+    )
+    if ($MobileView) {
+        Write-Step 'APP' 'Vista celular: ventana 390x844 px' 'Cyan'
+        $flutterArgs += @(
+            '--web-browser-flag=--window-size=390,844',
+            '--web-browser-flag=--window-position=120,40',
+            '--web-browser-flag=--disable-extensions'
+        )
+    }
+
+    & $flutter @flutterArgs
 }
 catch {
     Write-Host ''

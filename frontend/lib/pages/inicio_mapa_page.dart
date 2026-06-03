@@ -64,6 +64,9 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
 
+  /// Solo permite pan/zoom en el mapa cuando el panel inferior está casi cerrado.
+  bool _gestosMapaHabilitados = false;
+
   @override
   void initState() {
     super.initState();
@@ -254,7 +257,9 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
       }
     });
 
-    await _ajustarCamara();
+    if (salida != null && llegada != null) {
+      await _ajustarCamara();
+    }
   }
 
   Future<void> _onCoordenadas(
@@ -336,28 +341,58 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
     });
   }
 
+  bool get _googleMapsConfigurado {
+    final key = Config.googleMapsApiKey.trim();
+    return key.isNotEmpty && !key.contains('YOUR_GOOGLE');
+  }
+
+  Widget _buildMapa() {
+    if (!_googleMapsConfigurado) {
+      return Container(
+        color: const Color(0xFFE8F5E9),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(24),
+        child: const Text(
+          'Mapa no configurado.\n\n'
+          '1. Crea una API key en Google Cloud (Maps JavaScript API).\n'
+          '2. Pégala en lib/config/google_maps_config.dart\n'
+          '3. Ejecuta: scripts\\Sync-GoogleMapsKey.ps1\n'
+          '4. Reinicia la app (flutter run)\n\n'
+          'Guía: frontend/README_MAPS_ES.md',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF1B5E20), height: 1.4),
+        ),
+      );
+    }
+    return GoogleMap(
+      initialCameraPosition: const CameraPosition(
+        target: _centroMedellin,
+        zoom: 12,
+      ),
+      markers: _markers,
+      polylines: _polylines,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      scrollGesturesEnabled: _gestosMapaHabilitados,
+      zoomGesturesEnabled: _gestosMapaHabilitados,
+      rotateGesturesEnabled: _gestosMapaHabilitados,
+      tiltGesturesEnabled: _gestosMapaHabilitados,
+      onMapCreated: (ctrl) {
+        if (!_mapController.isCompleted) {
+          _mapController.complete(ctrl);
+        }
+        _ajustarCamara();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        GoogleMap(
-          initialCameraPosition: const CameraPosition(
-            target: _centroMedellin,
-            zoom: 12,
-          ),
-          markers: _markers,
-          polylines: _polylines,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          onMapCreated: (ctrl) {
-            if (!_mapController.isCompleted) {
-              _mapController.complete(ctrl);
-            }
-            _ajustarCamara();
-          },
-        ),
+        _buildMapa(),
         SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -479,27 +514,39 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
             ],
           ),
         ),
-        DraggableScrollableSheet(
-          initialChildSize: 0.42,
-          minChildSize: 0.18,
-          maxChildSize: 0.92,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 12,
-                    offset: Offset(0, -4),
+        NotificationListener<DraggableScrollableNotification>(
+          onNotification: (notification) {
+            final habilitar =
+                notification.extent <= notification.minExtent + 0.05;
+            if (habilitar != _gestosMapaHabilitados && mounted) {
+              setState(() => _gestosMapaHabilitados = habilitar);
+            }
+            return false;
+          },
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.42,
+            minChildSize: 0.18,
+            maxChildSize: 0.92,
+            builder: (context, scrollController) {
+              return Listener(
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 12,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                children: [
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    children: [
                   Center(
                     child: Container(
                       width: 40,
@@ -540,16 +587,18 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                     style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.35),
                   ),
                   const SizedBox(height: 16),
-                  CrearServicioForm(
-                    destinoQueryNotifier: _destinoQuery,
-                    bloqueoCrearMensaje: _mensajeBloqueoCrear,
-                    onCoordenadasSeleccion: _onCoordenadas,
-                    onServicioCreado: _alCrearServicio,
+                      CrearServicioForm(
+                        destinoQueryNotifier: _destinoQuery,
+                        bloqueoCrearMensaje: _mensajeBloqueoCrear,
+                        onCoordenadasSeleccion: _onCoordenadas,
+                        onServicioCreado: _alCrearServicio,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          },
+                ),
+              );
+            },
+          ),
         ),
       ],
     );

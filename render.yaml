@@ -1,0 +1,26 @@
+# Blueprint Render — conecta el repo y despliega el backend.
+# Dashboard: New > Blueprint > repo GoPoli > rama jorge (o main).
+# Tras el deploy, copia la URL a render.url (ver DEPLOY_RENDER.md).
+
+services:
+  - type: web
+    name: gopoli-backend
+    runtime: docker
+    region: ohio
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ubicaciones
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOPOLI_JWT_SECRET
+        generateValue: true
+      - key: SPRING_JPA_SHOW_SQL
+        value: "false"

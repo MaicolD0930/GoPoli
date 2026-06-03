@@ -8,17 +8,25 @@ La **API key** (clave de API) es un **código largo** que Google te da para deci
 2. Arriba, elige **Crear proyecto** (o selecciona uno que ya tengas).
 3. Menú ☰ → **APIs y servicios** → **Biblioteca**.
 4. Busca y pulsa **Activar** en:
-   - **Maps SDK for Android**
-   - **Directions API**
+   - **Maps JavaScript API** (obligatorio si corres en **Chrome/Edge**, Flutter Web)
+   - **Maps SDK for Android** (si compilas APK)
+   - **Directions API** (rutas por carretera; el backend la usa en `/ruta/direcciones`)
 5. Menú **Credenciales** → **+ Crear credenciales** → **Clave de API**.
 6. Copia la clave (normalmente empieza por `AIza...`).
 7. En tu PC, crea el archivo local (no se sube a Git):
    - Copia `frontend/lib/config/google_maps_config.example.dart` a `frontend/lib/config/google_maps_config.dart` (mismo nombre sin `.example`).
 8. Abre `google_maps_config.dart` y pega la clave **entre las comillas** de `kGoogleMapsApiKey`, por ejemplo:
    - `const String kGoogleMapsApiKey = 'AIzaSy...';`
-9. Guarda el archivo y vuelve a ejecutar la app (`flutter run`). **No hagas commit de `google_maps_config.dart`** (ya está en `.gitignore`).
+9. Guarda el archivo.
+10. **Solo Flutter Web:** sincroniza la clave al HTML (sin esto sale error `reading 'maps'`):
 
-Android toma la **misma** clave al compilar (no hace falta pegarla en otro sitio). Si más adelante usas **iOS**, copia la misma clave en `ios/Runner/Info.plist` en `GMSApiKey`.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Sync-GoogleMapsKey.ps1
+```
+
+11. Reinicia la app (`flutter run`). **No hagas commit de `google_maps_config.dart`** (ya está en `.gitignore`).
+
+Android toma la **misma** clave al compilar. En Web, `web/index.html` debe cargar el script de Google Maps con esa clave (el script de arriba lo actualiza). Si más adelante usas **iOS**, copia la misma clave en `ios/Runner/Info.plist` en `GMSApiKey`.
 
 ## Si no pones clave
 
