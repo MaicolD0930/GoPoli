@@ -57,6 +57,8 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
   int? ubicacionSalidaSeleccionada;
   int? ubicacionLlegadaSeleccionada;
   int capacidadSeleccionada = 2;
+  /// 1 = grupo de viaje, 3 = grupo conductor
+  int idTipoServicioSeleccionado = 1;
 
   DateTime? fechaSeleccionada;
   TimeOfDay? horaSeleccionada;
@@ -207,7 +209,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
           'idLugarLlegada': ubicacionLlegadaSeleccionada,
           'horaSalida': horaStr,
           'idCreador': SessionManager.idUsuario,
-          'idTipoServicio': 1,
+          'idTipoServicio': idTipoServicioSeleccionado,
           'capacidad': capacidadSeleccionada,
         }),
       );
@@ -244,6 +246,44 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: verdePrimario, width: 2),
       ),
+    );
+  }
+
+  Widget _buildSelectorTipoViaje() {
+    final esConductor = SessionManager.esConductor;
+    final bloqueado = widget.bloqueoCrearMensaje != null;
+    return Column(
+      children: [
+        RadioListTile<int>(
+          value: 1,
+          groupValue: idTipoServicioSeleccionado,
+          onChanged: bloqueado
+              ? null
+              : (v) => setState(() => idTipoServicioSeleccionado = v ?? 1),
+          title: const Text('Grupo de viaje'),
+          subtitle: const Text(
+            'Pasajeros que contratan servicio externo (taxi, InDrive, etc.)',
+            style: TextStyle(fontSize: 12),
+          ),
+          activeColor: verdePrimario,
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (esConductor)
+          RadioListTile<int>(
+            value: 3,
+            groupValue: idTipoServicioSeleccionado,
+            onChanged: bloqueado
+                ? null
+                : (v) => setState(() => idTipoServicioSeleccionado = v ?? 3),
+            title: const Text('Grupo conductor'),
+            subtitle: const Text(
+              'Viaje ofrecido por conductor con vehículo propio',
+              style: TextStyle(fontSize: 12),
+            ),
+            activeColor: verdePrimario,
+            contentPadding: EdgeInsets.zero,
+          ),
+      ],
     );
   }
 
@@ -449,6 +489,16 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
             ),
           ),
         ),
+        const SizedBox(height: 20),
+        const Text(
+          'Tipo de viaje *',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: verdePrimario,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildSelectorTipoViaje(),
         const SizedBox(height: 20),
         const Text(
           'Descripción',

@@ -6,6 +6,7 @@ import '../utils/session_manager.dart';
 import '../pages/crear_servicio_page.dart';
 import '../pages/grupo_page.dart';
 import '../pages/login_page.dart';
+import '../widgets/trip_type_badge.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -316,6 +317,11 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                TripTypeBadge(
+                                  tripTypeLabel: s['tripTypeLabel']?.toString(),
+                                  idTipoServicio: s['idTipoServicio'],
+                                ),
+                                const SizedBox(height: 8),
                                 Row(
                                   children: [
                                     const Icon(

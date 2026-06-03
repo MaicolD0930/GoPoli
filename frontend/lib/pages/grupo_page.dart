@@ -26,6 +26,15 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
   Timer? _timerAutoRefresh;
 
   /// Evita fallos al comparar idUsuario del JSON (int/num) con la sesión.
+  static String _etiquetaMiembro(Map miembro, bool esCreadorGrupo) {
+    final rolPart = miembro['rolParticipacionLabel']?.toString();
+    if (rolPart != null && rolPart.isNotEmpty) {
+      final grupo = esCreadorGrupo ? 'Creador del grupo' : 'Miembro';
+      return '$rolPart · $grupo';
+    }
+    return esCreadorGrupo ? 'Creador' : 'Miembro';
+  }
+
   static bool _mismoUsuario(dynamic idJson, int? idSesion) {
     if (idSesion == null || idJson == null) return false;
     final a = idJson is num ? idJson.toInt() : int.tryParse(idJson.toString());
@@ -502,7 +511,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
                 ],
               ),
               subtitle: Text(
-                esCreadorMiembro ? 'Creador' : 'Miembro',
+                _etiquetaMiembro(miembro, esCreadorMiembro),
                 style: TextStyle(
                   color: esCreadorMiembro ? verdePrimario : grisTexto,
                   fontSize: 12,
