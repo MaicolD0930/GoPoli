@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../config/config.dart';
-import '../pages/crear_usuario.dart';
-import '../utils/session_manager.dart';
-import '../pages/home_page.dart';
+
+import '../core/api_exception.dart';
+import '../services/auth_service.dart';
+import '../theme/app_colors.dart';
+import 'main_shell.dart';
+import 'registro_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,11 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   bool cargando = false;
   bool verContrasena = false;
 
-  // Colores del diseño
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-  static const Color amarillo = Color(0xFFFFC107);
-  static const Color grisTexto = Color(0xFF757575);
+  final _authService = const AuthService();
 
   Future<void> login() async {
     setState(() {
@@ -33,41 +29,26 @@ class _LoginPageState extends State<LoginPage> {
       mensaje = "";
     });
 
+    final navigator = Navigator.of(context);
+
     try {
-      final response = await http.post(
-        Uri.parse('${Config.apiUrl}/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'correo': correoController.text,
-          'contrasena': passController.text,
-        }),
+      await _authService.login(
+        correo: correoController.text,
+        contrasena: passController.text,
       );
-      //Validacion Login
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
 
-        SessionManager.iniciarSesion(
-          data['idUsuario'],
-          data['nombre'],
-          data['correo'],
-          data['idTipoUsuario'],
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
-      } else {
-        setState(() {
-          mensaje = "Correo o contraseña incorrectos";
-        });
-      }
+      if (!context.mounted) return;
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => mensaje = e.message);
     } catch (e) {
-      setState(() {
-        mensaje = "Error de conexión";
-      });
+      if (!mounted) return;
+      setState(() => mensaje = 'Error de conexión con el servidor');
     } finally {
-      setState(() => cargando = false);
+      if (mounted) setState(() => cargando = false);
     }
   }
 
@@ -89,7 +70,7 @@ class _LoginPageState extends State<LoginPage> {
                 style: TextStyle(
                   fontSize: 42,
                   fontWeight: FontWeight.w900,
-                  color: verdePrimario,
+                  color: AppColors.verdePrimario,
                   letterSpacing: -1,
                 ),
               ),
@@ -102,7 +83,7 @@ class _LoginPageState extends State<LoginPage> {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: verdeSecundario,
+                  color: AppColors.verdeSecundario,
                 ),
               ),
 
@@ -112,7 +93,7 @@ class _LoginPageState extends State<LoginPage> {
               const Text(
                 'Introduce tu correo electrónico y contraseña para iniciar sesión',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: grisTexto, height: 1.4),
+                style: TextStyle(fontSize: 14, color: AppColors.grisTexto, height: 1.4),
               ),
 
               const SizedBox(height: 36),
@@ -139,7 +120,7 @@ class _LoginPageState extends State<LoginPage> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
-                      color: verdePrimario,
+                      color: AppColors.verdePrimario,
                       width: 2,
                     ),
                   ),
@@ -162,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                   suffixIcon: IconButton(
                     icon: Icon(
                       verContrasena ? Icons.visibility_off : Icons.visibility,
-                      color: grisTexto,
+                      color: AppColors.grisTexto,
                     ),
                     onPressed: () =>
                         setState(() => verContrasena = !verContrasena),
@@ -178,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
-                      color: verdePrimario,
+                      color: AppColors.verdePrimario,
                       width: 2,
                     ),
                   ),
@@ -194,7 +175,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: ElevatedButton(
                   onPressed: cargando ? null : login,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: verdePrimario,
+                    backgroundColor: AppColors.verdePrimario,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -229,7 +210,7 @@ class _LoginPageState extends State<LoginPage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: mensaje.startsWith('Bienvenido')
-                        ? verdeSecundario
+                        ? AppColors.verdeSecundario
                         : Colors.red,
                     fontSize: 14,
                   ),
@@ -243,19 +224,19 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const Text(
                     '¿No tienes una cuenta? ',
-                    style: TextStyle(color: grisTexto, fontSize: 14),
+                    style: TextStyle(color: AppColors.grisTexto, fontSize: 14),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const CrearUsuarioPage(),
+                        builder: (_) => const RegistroPage(),
                       ),
                     ),
                     child: const Text(
                       'Crear una nueva cuenta',
                       style: TextStyle(
-                        color: amarillo,
+                        color: AppColors.amarillo,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -274,7 +255,7 @@ class _LoginPageState extends State<LoginPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       'O',
-                      style: TextStyle(color: grisTexto, fontSize: 13),
+                      style: TextStyle(color: AppColors.grisTexto, fontSize: 13),
                     ),
                   ),
                   const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
@@ -295,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
                     'https://www.google.com/favicon.ico',
                     width: 20,
                     height: 20,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.g_mobiledata,
                       color: Colors.blue,
                       size: 24,
@@ -310,7 +291,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: verdePrimario,
+                    backgroundColor: AppColors.verdePrimario,
                     foregroundColor: Colors.white,
                     side: BorderSide.none,
                     shape: RoundedRectangleBorder(
@@ -328,7 +309,7 @@ class _LoginPageState extends State<LoginPage> {
                 text: TextSpan(
                   style: const TextStyle(
                     fontSize: 12,
-                    color: grisTexto,
+                    color: AppColors.grisTexto,
                     height: 1.5,
                   ),
                   children: [
@@ -338,7 +319,7 @@ class _LoginPageState extends State<LoginPage> {
                     TextSpan(
                       text: 'Términos de Servicio',
                       style: const TextStyle(
-                        color: amarillo,
+                        color: AppColors.amarillo,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -346,7 +327,7 @@ class _LoginPageState extends State<LoginPage> {
                     TextSpan(
                       text: 'Política de Privacidad',
                       style: const TextStyle(
-                        color: amarillo,
+                        color: AppColors.amarillo,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

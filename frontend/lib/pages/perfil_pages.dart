@@ -1,352 +1,466 @@
 import 'package:flutter/material.dart';
 
+import '../core/api_exception.dart';
+import '../models/usuario.dart';
+import '../services/usuario_service.dart';
+import '../theme/app_colors.dart';
+import '../utils/session_manager.dart';
+import '../widgets/profile_avatar.dart';
+import 'bienvenida_page.dart';
+import 'editar_perfil_page.dart';
+import 'historial_viajes_page.dart';
+import 'login_page.dart';
+import 'registro_conductor_page.dart';
+
+/// DEV-10 / HU-04 — Ver perfil (+ acciones HU-05 y HU-06).
 class PerfilPage extends StatefulWidget {
-  const PerfilPage({super.key});
+  const PerfilPage({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<PerfilPage> createState() => _PerfilPageState();
 }
 
 class _PerfilPageState extends State<PerfilPage> {
-  // Colores del diseño
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-  static const Color amarillo = Color(0xFFFFC107);
-  static const Color grisTexto = Color(0xFF757575);
-  static const Color grisClaro = Color(0xFFF5F5F5);
+  final _usuarioService = const UsuarioService();
+  Usuario? _usuario;
+  bool _cargando = true;
+  String? _error;
 
-  // Rol seleccionado: 0 = Pasajero, 1 = Chofer
-  int rolSeleccionado = 0;
+  @override
+  void initState() {
+    super.initState();
+    _cargarPerfil();
+  }
 
-  // Índice del tab seleccionado en la barra inferior
-  int tabSeleccionado = 4;
+  Future<void> _cargarPerfil() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      final u = await _usuarioService.obtenerPerfil();
+      await SessionManager.actualizarUsuario(u);
+      if (!mounted) return;
+      setState(() {
+        _usuario = u;
+        _cargando = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _cargando = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No se pudo cargar el perfil';
+        _cargando = false;
+      });
+    }
+  }
+
+  Future<void> _irAEditar() async {
+    if (_usuario == null) return;
+    final actualizado = await Navigator.push<Usuario>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditarPerfilPage(usuarioInicial: _usuario!),
+      ),
+    );
+    if (actualizado != null) {
+      setState(() => _usuario = actualizado);
+    } else {
+      await _cargarPerfil();
+    }
+  }
+
+  Future<void> _cerrarSesion() async {
+    await SessionManager.cerrarSesion();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (_) => false,
+    );
+  }
+
+  Future<void> _inhabilitarCuenta() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Inhabilitar cuenta'),
+        content: const Text(
+          'Tu cuenta quedará desactivada y no podrás iniciar sesión. '
+          '¿Deseas continuar?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Inhabilitar', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      await _usuarioService.inhabilitarCuenta();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (_) => false,
+      );
+    } on ApiException catch (e) {
+      _mostrarSnack(e.message);
+    } catch (_) {
+      _mostrarSnack('Error al inhabilitar la cuenta');
+    }
+  }
+
+  Future<void> _eliminarCuenta() async {
+    final paso1 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: const Text(
+          'Esta acción es permanente. Se borrarán tus datos y no podrás recuperarlos.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (paso1 != true || !mounted) return;
+
+    final paso2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Estás seguro?'),
+        content: const Text(
+          'Confirma que deseas eliminar tu cuenta de forma definitiva.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (paso2 != true || !mounted) return;
+
+    try {
+      await _usuarioService.eliminarCuenta();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const BienvenidaPage()),
+        (_) => false,
+      );
+    } on ApiException catch (e) {
+      _mostrarSnack(e.message);
+    } catch (_) {
+      _mostrarSnack('Error al eliminar la cuenta');
+    }
+  }
+
+  void _mostrarSnack(String msg, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color ?? Colors.red.shade700,
+      ),
+    );
+  }
+
+  bool get _esConductor =>
+      _usuario?.isDriver == true || SessionManager.esConductor;
+
+  Future<void> _irRegistroConductor() async {
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const RegistroConductorPage()),
+    );
+    if (ok == true) await _cargarPerfil();
+  }
+
+  Future<void> _dejarConductor() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dejar la Chamba'),
+        content: const Text(
+          'Dejarás de ser conductor y volverás a usuario pasajero. '
+          'Tu vehículo registrado se eliminará.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+
+    try {
+      await _usuarioService.unregisterAsDriver();
+      if (!mounted) return;
+      _mostrarSnack(
+        'Ya no eres conductor. Sigues como pasajero.',
+        color: AppColors.verdePrimario,
+      );
+      await _cargarPerfil();
+    } on ApiException catch (e) {
+      _mostrarSnack(e.message);
+    } catch (_) {
+      _mostrarSnack('No se pudo completar la acción');
+    }
+  }
+
+  void _irHistorial() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HistorialViajesPage()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final u = _usuario;
+    final nombre = u?.nombre ?? SessionManager.nombre ?? 'Usuario';
+    final correo = u?.correo ?? SessionManager.correo ?? '';
+    final foto = u?.fotoPerfil ?? SessionManager.fotoPerfil;
+    final nota = u?.nota ?? SessionManager.nota;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: const Icon(Icons.arrow_back, color: Colors.black),
-        centerTitle: true,
-        title: const Text(
-          'Mi Perfil',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.settings_outlined, color: Colors.black),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Sección avatar + nombre ──
-            Center(
-              child: Column(
-                children: [
-                  const SizedBox(height: 16),
-
-                  // Avatar circular
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFFE0B2),
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              foregroundColor: Colors.black,
+              title: const Text(
+                'Mi perfil',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+              ),
+              actions: [
+                if (!_cargando && _error == null)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: _irAEditar,
+                    tooltip: 'Editar perfil',
+                  ),
+              ],
+            ),
+      body: _cargando
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.verdePrimario),
+            )
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _cargarPerfil,
+                          child: const Text('Reintentar'),
                         ),
                       ],
                     ),
-                    child: const ClipOval(
-                      child: Icon(
-                        Icons.person,
-                        size: 70,
-                        color: Color(0xFFBCAAA4),
-                      ),
-                    ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Nombre
-                  const Text(
-                    'Lucas Ramirez',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  // Correo
-                  const Text(
-                    'lucas.ramirez@elpoli.edu.co',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: verdeSecundario,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-
-            // ── Carrera y Documento ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  _infoRow(
-                    icon: Icons.school_outlined,
-                    label: 'Carrera',
-                    value: 'Ingeniería de Sistemas',
-                  ),
-                  const SizedBox(height: 16),
-                  _infoRow(
-                    icon: Icons.badge_outlined,
-                    label: 'Documento',
-                    value: 'CC 12345678',
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // ── Cambiar Rol ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Cambiar Rol',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Toggle Pasajero / Chofer
-                  Container(
-                    decoration: BoxDecoration(
-                      color: grisClaro,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
+                )
+              : RefreshIndicator(
+                  onRefresh: _cargarPerfil,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
                       children: [
-                        _rolTab('Pasajero', 0),
-                        _rolTab('Chofer', 1),
+                        if (widget.embedded)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, right: 8),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: const Icon(Icons.edit, color: AppColors.verdePrimario),
+                                onPressed: _irAEditar,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                        ProfileAvatar(fotoBase64: foto, radius: 50),
+                        const SizedBox(height: 12),
+                        Text(
+                          nombre,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          correo.isEmpty ? 'Sin correo' : correo,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.verdeSecundario,
+                          ),
+                        ),
+                        if (u?.tel != null && u!.tel!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            u.tel!,
+                            style: const TextStyle(color: AppColors.grisTexto),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        RatingBadge(nota: nota),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Rol: ${SessionManager.etiquetaTipoUsuario()}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.grisTexto,
+                            ),
+                          ),
+                        ),
+                        if (u?.vehiculo != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${u!.vehiculo!.marca} ${u.vehiculo!.modelo} · ${u.vehiculo!.color} · ${u.vehiculo!.placa}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.grisTexto,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        if (!_esConductor)
+                          _bannerConductor()
+                        else
+                          _boton(
+                            label: 'Dejar la Chamba',
+                            color: const Color(0xFF5D4037),
+                            onPressed: _dejarConductor,
+                          ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Historial de viajes',
+                          color: const Color(0xFF1565C0),
+                          onPressed: _irHistorial,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Editar perfil',
+                          color: AppColors.verdePrimario,
+                          onPressed: _irAEditar,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Cerrar sesión',
+                          color: AppColors.amarillo,
+                          onPressed: _cerrarSesion,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Inhabilitar cuenta',
+                          color: Colors.orange,
+                          onPressed: _inhabilitarCuenta,
+                        ),
+                        const SizedBox(height: 12),
+                        _boton(
+                          label: 'Eliminar cuenta',
+                          color: Colors.red.shade700,
+                          onPressed: _eliminarCuenta,
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+    );
+  }
 
-            const SizedBox(height: 28),
-
-            // ── Opciones ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Opciones',
+  Widget _bannerConductor() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Material(
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: _irRegistroConductor,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.directions_car, color: AppColors.verdePrimario),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    '¿Quieres ser parte nuestra?',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _opcionRow(Icons.history_outlined, 'Historial de viajes'),
-                  _divider(),
-                  _opcionRow(Icons.credit_card_outlined, 'Métodos de pago'),
-                  _divider(),
-                  _opcionRow(Icons.help_outline, 'Ayuda'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── Botón Cerrar Sesión ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Cerrar sesión - implementar después
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: amarillo,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Cerrar Sesión',
-                    style: TextStyle(
-                      fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.verdePrimario,
                     ),
                   ),
                 ),
-              ),
+                Icon(Icons.chevron_right, color: Colors.green.shade800),
+              ],
             ),
-
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
-      ),
-
-      // ── Barra de navegación inferior ──
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: tabSeleccionado,
-        onTap: (i) => setState(() => tabSeleccionado = i),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: verdePrimario,
-        unselectedItemColor: grisTexto,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        elevation: 8,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search_outlined),
-            activeIcon: Icon(Icons.search),
-            label: 'Buscar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_car_outlined),
-            activeIcon: Icon(Icons.directions_car),
-            label: 'Viajes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
-            label: 'Grupos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
-        ],
       ),
     );
   }
 
-  // ── Widget: fila de info (carrera, documento) ──
-  Widget _infoRow({
-    required IconData icon,
+  Widget _boton({
     required String label,
-    required String value,
+    required Color color,
+    required VoidCallback onPressed,
   }) {
-    return Row(
-      children: [
-        Icon(icon, color: verdeSecundario, size: 26),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: grisTexto),
-            ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ── Widget: tab de rol (Pasajero / Chofer) ──
-  Widget _rolTab(String label, int index) {
-    final seleccionado = rolSeleccionado == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => rolSeleccionado = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: seleccionado ? verdePrimario : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: seleccionado ? Colors.white : grisTexto,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Widget: fila de opción con flecha ──
-  Widget _opcionRow(IconData icon, String label) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        children: [
-          Icon(icon, color: grisTexto, size: 22),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 15, color: Colors.black),
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          const Icon(Icons.chevron_right, color: grisTexto),
-        ],
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
       ),
     );
-  }
-
-  // ── Widget: línea divisora ──
-  Widget _divider() {
-    return const Divider(height: 1, color: Color(0xFFEEEEEE));
   }
 }
