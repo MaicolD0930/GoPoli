@@ -8,6 +8,7 @@ import com.proyect.gopoli.model.Usuario;
 import com.proyect.gopoli.repository.ServicioRepository;
 import com.proyect.gopoli.repository.ServicioUsuarioRepository;
 import com.proyect.gopoli.repository.UsuarioRepository;
+import com.proyect.gopoli.security.JwtAuthSupport;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,10 +28,19 @@ public class ServicioController {
     ServicioUsuarioRepository servicioUsuarioRepo;
     @Autowired
     UsuarioRepository usuarioRepo;
+    @Autowired
+    JwtAuthSupport authSupport;
 
     @PostMapping("/servicio/crear")
-    public ResponseEntity<?> crearServicio(@RequestBody Servicio servicio) {
+    public ResponseEntity<?> crearServicio(
+            @RequestBody Servicio servicio,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> creadorAuth = authSupport.usuarioFromAuth(auth);
+            if (creadorAuth.isEmpty()) {
+                return authSupport.unauthorized();
+            }
+            servicio.setIdCreador(creadorAuth.get().getIdUsuario());
             if (servicio.getIdLugarSalida() == null) {
                 return ResponseEntity.status(400).body("El lugar de salida es obligatorio");
             }
@@ -105,9 +115,18 @@ public class ServicioController {
     }
 
     @PutMapping("/servicio/cancelar/{idServicio}")
-    public ResponseEntity<?> cancelarServicio(@PathVariable Integer idServicio) {
+    public ResponseEntity<?> cancelarServicio(
+            @PathVariable Integer idServicio,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
             return servicioRepo.findById(idServicio).map(servicio -> {
+                if (!authSupport.esCreador(servicio, usuarioOpt.get())) {
+                    return authSupport.forbidden();
+                }
                 servicio.setIdEstadoServicio(GoPoliConstants.ESTADO_SERVICIO_CANCELADO);
                 servicioRepo.save(servicio);
                 return ResponseEntity.ok("Servicio cancelado");
@@ -118,9 +137,18 @@ public class ServicioController {
     }
 
     @PutMapping("/servicio/finalizar/{idServicio}")
-    public ResponseEntity<?> finalizarViaje(@PathVariable Integer idServicio) {
+    public ResponseEntity<?> finalizarViaje(
+            @PathVariable Integer idServicio,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
             return servicioRepo.findById(idServicio).map(servicio -> {
+                if (!authSupport.esCreador(servicio, usuarioOpt.get())) {
+                    return authSupport.forbidden();
+                }
                 servicio.setIdEstadoServicio(GoPoliConstants.ESTADO_SERVICIO_FINALIZADO);
                 servicioRepo.save(servicio);
                 return ResponseEntity.ok("Viaje finalizado");
@@ -131,9 +159,18 @@ public class ServicioController {
     }
 
     @PutMapping("/servicio/iniciar/{idServicio}")
-    public ResponseEntity<?> iniciarViaje(@PathVariable Integer idServicio) {
+    public ResponseEntity<?> iniciarViaje(
+            @PathVariable Integer idServicio,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
             return servicioRepo.findById(idServicio).map(servicio -> {
+                if (!authSupport.esCreador(servicio, usuarioOpt.get())) {
+                    return authSupport.forbidden();
+                }
                 servicio.setIdEstadoServicio(GoPoliConstants.ESTADO_SERVICIO_EN_CURSO);
                 servicioRepo.save(servicio);
                 return ResponseEntity.ok("Viaje iniciado");
@@ -178,10 +215,16 @@ public class ServicioController {
     }
 
     @PostMapping("/servicio/unirse")
-    public ResponseEntity<?> unirse(@RequestBody Map<String, Integer> body) {
+    public ResponseEntity<?> unirse(
+            @RequestBody Map<String, Integer> body,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
             Integer idServicio = body.get("idServicio");
-            Integer idUsuario = body.get("idUsuario");
+            Integer idUsuario = usuarioOpt.get().getIdUsuario();
 
             Servicio servicio = servicioRepo.findById(idServicio).orElse(null);
             if (servicio == null) {
@@ -230,8 +273,18 @@ public class ServicioController {
     }
 
     @DeleteMapping("/servicio/salir/{idServicio}/{idUsuario}")
-    public ResponseEntity<?> salirGrupo(@PathVariable Integer idServicio, @PathVariable Integer idUsuario) {
+    public ResponseEntity<?> salirGrupo(
+            @PathVariable Integer idServicio,
+            @PathVariable Integer idUsuario,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
+            if (!authSupport.mismoUsuario(usuarioOpt.get(), idUsuario)) {
+                return authSupport.forbidden();
+            }
             Servicio servicio = servicioRepo.findById(idServicio).orElse(null);
             if (servicio == null) {
                 return ResponseEntity.status(404).body("Servicio no encontrado");
@@ -252,8 +305,17 @@ public class ServicioController {
     }
 
     @GetMapping("/servicio/usuario/activo/{idUsuario}")
-    public ResponseEntity<?> getServicioActivoUsuario(@PathVariable Integer idUsuario) {
+    public ResponseEntity<?> getServicioActivoUsuario(
+            @PathVariable Integer idUsuario,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
+            if (!authSupport.mismoUsuario(usuarioOpt.get(), idUsuario)) {
+                return authSupport.forbidden();
+            }
             List<Servicio> activos = servicioRepo.findByIdCreadorAndIdEstadoServicio(
                     idUsuario, GoPoliConstants.ESTADO_SERVICIO_ACTIVO);
             if (activos.isEmpty()) {
@@ -266,8 +328,17 @@ public class ServicioController {
     }
 
     @GetMapping("/servicio/usuario/miembro/{idUsuario}")
-    public ResponseEntity<?> getServicioComoMiembro(@PathVariable Integer idUsuario) {
+    public ResponseEntity<?> getServicioComoMiembro(
+            @PathVariable Integer idUsuario,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
+            if (!authSupport.mismoUsuario(usuarioOpt.get(), idUsuario)) {
+                return authSupport.forbidden();
+            }
             List<ServicioUsuario> grupos = servicioUsuarioRepo.findByIdUsuario(idUsuario);
             for (ServicioUsuario su : grupos) {
                 Servicio servicio = servicioRepo.findById(su.getIdServicio()).orElse(null);
@@ -282,8 +353,17 @@ public class ServicioController {
     }
 
     @GetMapping("/servicio/usuario/encurso/{idUsuario}")
-    public ResponseEntity<?> getServicioEnCurso(@PathVariable Integer idUsuario) {
+    public ResponseEntity<?> getServicioEnCurso(
+            @PathVariable Integer idUsuario,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
+            Optional<Usuario> usuarioOpt = authSupport.usuarioFromAuth(auth);
+            if (usuarioOpt.isEmpty()) {
+                return authSupport.unauthorized();
+            }
+            if (!authSupport.mismoUsuario(usuarioOpt.get(), idUsuario)) {
+                return authSupport.forbidden();
+            }
             List<Servicio> encurso = servicioRepo.findByIdCreadorAndIdEstadoServicio(
                     idUsuario, GoPoliConstants.ESTADO_SERVICIO_EN_CURSO);
             if (!encurso.isEmpty()) {

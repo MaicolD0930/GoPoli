@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'inicio_mapa_page.dart';
+import '../theme/app_colors.dart';
 import 'home_page.dart';
+import 'inicio_mapa_page.dart';
 import 'viajes_tab_page.dart';
 import 'grupo_page.dart';
 import 'perfil_pages.dart';
@@ -21,9 +22,6 @@ class _MainShellState extends State<MainShell> {
 
   /// Pide a [InicioMapaPage] dibujar la ruta del servicio y cambia al tab Inicio.
   final ValueNotifier<int?> _viajeEnMapa = ValueNotifier<int?>(null);
-
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color grisTexto = Color(0xFF757575);
 
   static const _titulos = [
     'Inicio',
@@ -52,7 +50,7 @@ class _MainShellState extends State<MainShell> {
           _titulos[_index],
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: verdePrimario,
+        backgroundColor: AppColors.verdePrimario,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         elevation: 0,
@@ -83,8 +81,8 @@ class _MainShellState extends State<MainShell> {
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: verdePrimario,
-        unselectedItemColor: grisTexto,
+        selectedItemColor: AppColors.verdePrimario,
+        unselectedItemColor: AppColors.grisTexto,
         selectedFontSize: 11,
         unselectedFontSize: 11,
         items: const [

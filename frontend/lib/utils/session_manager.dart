@@ -12,6 +12,7 @@ class SessionManager {
   static const _keyTipo = 'gopoli_tipo_usuario';
   static const _keyNota = 'gopoli_nota';
   static const _keyFoto = 'gopoli_foto';
+  static const _keyRolElegido = 'gopoli_rol_elegido';
 
   static String? token;
   static int? idUsuario;
@@ -31,7 +32,8 @@ class SessionManager {
     idUsuario = data.usuario.idUsuario;
     nombre = data.usuario.nombre;
     correo = data.usuario.correo;
-    idTipoUsuario = data.usuario.idTipoUsuario;
+    idTipoUsuario = data.usuario.idTipoUsuario ??
+        (data.usuario.isDriver ? 2 : 1);
     nota = data.usuario.nota;
     fotoPerfil = data.usuario.fotoPerfil;
 
@@ -57,6 +59,10 @@ class SessionManager {
     fotoPerfil = u.fotoPerfil;
     if (u.idTipoUsuario != null) {
       idTipoUsuario = u.idTipoUsuario;
+    } else if (u.isDriver) {
+      idTipoUsuario = 2;
+    }
+    if (idTipoUsuario != null) {
       await _storage.write(key: _keyTipo, value: idTipoUsuario.toString());
     }
     await _storage.write(key: _keyNombre, value: nombre);
@@ -102,6 +108,15 @@ class SessionManager {
   static String etiquetaTipoUsuario() {
     if (esConductor) return 'Conductor';
     return 'Pasajero';
+  }
+
+  static Future<bool> rolConductorYaElegido() async {
+    final v = await _storage.read(key: _keyRolElegido);
+    return v == '1';
+  }
+
+  static Future<void> marcarRolConductorElegido() async {
+    await _storage.write(key: _keyRolElegido, value: '1');
   }
 }
 

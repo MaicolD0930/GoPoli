@@ -19,7 +19,7 @@ class RouteService {
         },
       );
 
-      final res = await http.get(uri).timeout(const Duration(seconds: 20));
+      final res = await http.get(uri).timeout(Config.apiTimeout);
       if (res.statusCode != 200) {
         return [origen, destino];
       }

@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:convert';
 import '../config/config.dart';
+import '../core/api_client.dart';
+import '../theme/app_colors.dart';
 import '../utils/session_manager.dart';
 
 int? _parseUbicacionId(dynamic v) {
@@ -46,9 +48,9 @@ class CrearServicioForm extends StatefulWidget {
 }
 
 class _CrearServicioFormState extends State<CrearServicioForm> {
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-  static const Color grisTexto = Color(0xFF757575);
+  static const Color verdePrimario = AppColors.verdePrimario;
+  static const Color verdeSecundario = AppColors.verdeSecundario;
+  static const Color grisTexto = AppColors.grisTexto;
 
   final descripcionController = TextEditingController();
 
@@ -201,14 +203,13 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
     try {
       final res = await http.post(
         Uri.parse('${Config.apiUrl}/servicio/crear'),
-        headers: {'Content-Type': 'application/json'},
+        headers: ApiClient.jsonHeaders(withAuth: true),
         body: jsonEncode({
           'fecha': fechaStr,
           'descripcion': descripcionController.text,
           'idLugarSalida': ubicacionSalidaSeleccionada,
           'idLugarLlegada': ubicacionLlegadaSeleccionada,
           'horaSalida': horaStr,
-          'idCreador': SessionManager.idUsuario,
           'idTipoServicio': idTipoServicioSeleccionado,
           'capacidad': capacidadSeleccionada,
         }),
@@ -232,15 +233,15 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
   InputDecoration _inputDecoration({String hint = ''}) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+      hintStyle: const TextStyle(color: AppColors.hint),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: AppColors.bordeCampo),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: AppColors.bordeCampo),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -314,7 +315,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
                       setState(() => ubicacionLlegadaSeleccionada = id);
                       _notificarCoordenadas();
                     },
-              backgroundColor: const Color(0xFFE8F5E9),
+              backgroundColor: AppColors.surfaceGreen,
             );
           }).toList(),
         ),
@@ -337,21 +338,21 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF3E0),
+              color: AppColors.warningSurface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFFFB74D)),
+              border: Border.all(color: AppColors.amarillo),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline, color: Color(0xFFE65100)),
+                const Icon(Icons.info_outline, color: AppColors.warning),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     widget.bloqueoCrearMensaje!,
                     style: const TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFBF360C),
+                      color: AppColors.warning,
                       height: 1.35,
                     ),
                   ),
@@ -433,7 +434,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE0E0E0)),
+              border: Border.all(color: AppColors.bordeCampo),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -446,7 +447,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
                       : '${fechaSeleccionada!.day}/${fechaSeleccionada!.month}/${fechaSeleccionada!.year}',
                   style: TextStyle(
                     color: fechaSeleccionada == null
-                        ? const Color(0xFFBDBDBD)
+                        ? AppColors.hint
                         : Colors.black87,
                   ),
                 ),
@@ -468,7 +469,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE0E0E0)),
+              border: Border.all(color: AppColors.bordeCampo),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -481,7 +482,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
                       : horaSeleccionada!.format(context),
                   style: TextStyle(
                     color: horaSeleccionada == null
-                        ? const Color(0xFFBDBDBD)
+                        ? AppColors.hint
                         : Colors.black87,
                   ),
                 ),
@@ -593,7 +594,7 @@ class _CrearServicioFormState extends State<CrearServicioForm> {
             style: TextStyle(
               color: mensaje.contains('exitosamente')
                   ? verdeSecundario
-                  : Colors.red,
+                  : AppColors.error,
               fontSize: 14,
             ),
           ),

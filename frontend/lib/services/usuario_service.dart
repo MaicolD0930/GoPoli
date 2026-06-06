@@ -93,7 +93,7 @@ class UsuarioService {
             Uri.parse('${Config.apiUrl}/usuario/me/historial-viajes'),
             headers: ApiClient.jsonHeaders(),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(Config.apiTimeout);
 
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
@@ -115,7 +115,7 @@ class UsuarioService {
           Uri.parse('${Config.apiUrl}/usuario/me/inhabilitar'),
           headers: ApiClient.jsonHeaders(),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(Config.apiTimeout);
 
     if (response.statusCode != 200) {
       throw ApiException.fromResponse(response.statusCode, response.body);
@@ -129,7 +129,7 @@ class UsuarioService {
           Uri.parse('${Config.apiUrl}/usuario/me'),
           headers: ApiClient.jsonHeaders(),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(Config.apiTimeout);
 
     if (response.statusCode != 200) {
       throw ApiException.fromResponse(response.statusCode, response.body);
@@ -137,9 +137,30 @@ class UsuarioService {
     await SessionManager.cerrarSesion();
   }
 
+  Future<void> calificarUsuario({
+    required int idUsuario,
+    required int idServicio,
+    required int puntuacion,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('${Config.apiUrl}/usuario/$idUsuario/calificar'),
+          headers: ApiClient.jsonHeaders(),
+          body: jsonEncode({
+            'puntuacion': puntuacion,
+            'idServicio': idServicio,
+          }),
+        )
+        .timeout(Config.apiTimeout);
+
+    if (response.statusCode != 200) {
+      throw ApiException.fromResponse(response.statusCode, response.body);
+    }
+  }
+
   Future<Usuario> _request(Future<http.Response> Function() call) async {
     try {
-      final response = await call().timeout(const Duration(seconds: 15));
+      final response = await call().timeout(Config.apiTimeout);
       if (response.statusCode == 200) {
         return Usuario.fromJson(
           jsonDecode(response.body) as Map<String, dynamic>,

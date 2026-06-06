@@ -139,6 +139,14 @@ SELECT COUNT(*) AS ubicaciones FROM ubicacion;
 
 Deberías ver las mismas tablas que en local (`usuario`, `ubicacion`, `servicio`, `carrera`, etc.) y los mismos conteos de filas.
 
+### Corregir columna `nota` (tipo incorrecto)
+
+Si al arrancar el backend aparece:
+
+`ERROR: column "nota" cannot be cast automatically to type double precision`
+
+Ejecuta en el **SQL Editor** de Neon el script [`backend/scripts/fix_usuario_nota_column.sql`](backend/scripts/fix_usuario_nota_column.sql).
+
 ## 4) Arrancar el backend contra Neon
 
 PowerShell:
@@ -194,8 +202,9 @@ La app móvil sigue usando `--dart-define=API_URL=...` hacia Railway; solo cambi
 - No commitear `.env`, dumps (`gopoli.dump`) ni contraseñas.
 - Rotar la contraseña Neon si se filtra; actualizar variables en Railway y en el `.env` de cada uno.
 
-## Referencias en el repo
+- Referencias en el repo
 
+- Alineación código ↔ BD (solo lectura): [`BD_ALINEACION.md`](../BD_ALINEACION.md)
 - Config Spring: `backend/src/main/resources/application.properties`
 - Seeds de coordenadas: `UbicacionCoordenadasSeeder` + `backend/scripts/seed_ubicaciones_metro_poli.sql`
 - Deploy API: `DEPLOY_RAILWAY.md`

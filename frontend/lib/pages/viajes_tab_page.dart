@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/config.dart';
+import '../core/api_client.dart';
+import '../theme/app_colors.dart';
 import '../utils/session_manager.dart';
 
 /// Grupo en planificación + viaje en curso (sustituye la antigua pestaña Grupos).
@@ -22,10 +24,6 @@ class ViajesTabPage extends StatefulWidget {
 }
 
 class _ViajesTabPageState extends State<ViajesTabPage> {
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-  static const Color grisTexto = Color(0xFF757575);
-
   int? idServicioActivo;
   int? idServicioEnCurso;
   bool cargando = true;
@@ -61,6 +59,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
         Uri.parse(
           '${Config.apiUrl}/servicio/usuario/activo/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -71,6 +70,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
           Uri.parse(
             '${Config.apiUrl}/servicio/usuario/miembro/${SessionManager.idUsuario}',
           ),
+          headers: ApiClient.jsonHeaders(),
         );
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -89,6 +89,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
         Uri.parse(
           '${Config.apiUrl}/servicio/usuario/encurso/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -109,7 +110,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
         idServicioActivo == null && idServicioEnCurso == null;
 
     return RefreshIndicator(
-      color: verdePrimario,
+      color: AppColors.verdePrimario,
       onRefresh: _cargar,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -135,14 +136,14 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
               padding: const EdgeInsets.only(top: 24),
               child: Column(
                 children: [
-                  Icon(Icons.map_outlined, size: 72, color: Colors.grey[300]),
+                  Icon(Icons.map_outlined, size: 72, color: AppColors.bordeCampo),
                   const SizedBox(height: 16),
                   const Text(
                     'Sin grupo ni viaje activo',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 17,
-                      color: grisTexto,
+                      color: AppColors.grisTexto,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -151,7 +152,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                     'Crea un servicio en Inicio o únete desde Buscar. '
                     'Cuando haya viaje en curso, verás la ruta en el mapa.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 14, color: AppColors.grisTexto),
                   ),
                 ],
               ),
@@ -175,8 +176,8 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: verdePrimario.withValues(alpha: 0.15),
-                child: const Icon(Icons.group, color: verdePrimario),
+                backgroundColor: AppColors.verdePrimario.withValues(alpha: 0.15),
+                child: const Icon(Icons.group, color: AppColors.verdePrimario),
               ),
               const SizedBox(width: 16),
               const Expanded(
@@ -193,7 +194,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                     SizedBox(height: 4),
                     Text(
                       'Planificación — miembros, iniciar o cancelar',
-                      style: TextStyle(fontSize: 13, color: grisTexto),
+                      style: TextStyle(fontSize: 13, color: AppColors.grisTexto),
                     ),
                   ],
                 ),
@@ -210,7 +211,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
     final id = idServicioEnCurso!;
     return Card(
       elevation: 3,
-      shadowColor: verdeSecundario.withValues(alpha: 0.35),
+      shadowColor: AppColors.verdeSecundario.withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -227,8 +228,8 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    verdeSecundario,
-                    verdeSecundario.withValues(alpha: 0.85),
+                    AppColors.verdeSecundario,
+                    AppColors.verdeSecundario.withValues(alpha: 0.85),
                   ],
                 ),
               ),
@@ -269,7 +270,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                     'La ruta está en el mapa de Inicio (salida, destino y camino).',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[700],
+                      color: AppColors.grisTexto,
                       height: 1.35,
                     ),
                   ),
@@ -279,7 +280,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                     icon: const Icon(Icons.map),
                     label: const Text('Ver ruta en el mapa'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: verdeSecundario,
+                      backgroundColor: AppColors.verdeSecundario,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -290,8 +291,8 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                     icon: const Icon(Icons.groups_outlined),
                     label: const Text('Grupo: miembros y acciones'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: verdePrimario,
-                      side: const BorderSide(color: verdePrimario),
+                      foregroundColor: AppColors.verdePrimario,
+                      side: const BorderSide(color: AppColors.verdePrimario),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
@@ -317,16 +318,16 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            verdePrimario.withValues(alpha: 0.12),
-            verdeSecundario.withValues(alpha: 0.08),
+            AppColors.verdePrimario.withValues(alpha: 0.12),
+            AppColors.verdeSecundario.withValues(alpha: 0.08),
           ],
         ),
-        border: Border.all(color: verdePrimario.withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.verdePrimario.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icono, size: 36, color: verdePrimario),
+          Icon(icono, size: 36, color: AppColors.verdePrimario),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -337,7 +338,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: verdePrimario,
+                    color: AppColors.verdePrimario,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -345,7 +346,7 @@ class _ViajesTabPageState extends State<ViajesTabPage> {
                   subtitulo,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey[700],
+                    color: AppColors.grisTexto,
                     height: 1.3,
                   ),
                 ),

@@ -110,7 +110,7 @@ class _HistorialViajesPageState extends State<HistorialViajesPage> {
                                       const SizedBox(width: 8),
                                       _badge(
                                         v.miRolParticipacionLabel ?? 'Pasajero',
-                                        const Color(0xFF1565C0),
+                                        AppColors.conductor,
                                       ),
                                     ],
                                   ),

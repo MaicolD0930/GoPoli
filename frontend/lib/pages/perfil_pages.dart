@@ -99,7 +99,7 @@ class _PerfilPageState extends State<PerfilPage> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Inhabilitar', style: TextStyle(color: Colors.orange)),
+            child: const Text('Inhabilitar', style: TextStyle(color: AppColors.warning)),
           ),
         ],
       ),
@@ -132,7 +132,7 @@ class _PerfilPageState extends State<PerfilPage> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Continuar', style: TextStyle(color: Colors.red)),
+            child: const Text('Continuar', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -150,7 +150,7 @@ class _PerfilPageState extends State<PerfilPage> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí, eliminar', style: TextStyle(color: Colors.red)),
+            child: const Text('Sí, eliminar', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -175,7 +175,7 @@ class _PerfilPageState extends State<PerfilPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: color ?? Colors.red.shade700,
+        backgroundColor: color ?? AppColors.error,
       ),
     );
   }
@@ -337,15 +337,19 @@ class _PerfilPageState extends State<PerfilPage> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
+                            color: _esConductor
+                                ? AppColors.surfaceGreen
+                                : AppColors.surfaceMuted,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Rol: ${SessionManager.etiquetaTipoUsuario()}',
-                            style: const TextStyle(
+                            SessionManager.etiquetaTipoUsuario(),
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.grisTexto,
+                              color: _esConductor
+                                  ? AppColors.conductor
+                                  : AppColors.grisTexto,
                             ),
                           ),
                         ),
@@ -366,13 +370,13 @@ class _PerfilPageState extends State<PerfilPage> {
                         else
                           _boton(
                             label: 'Dejar la Chamba',
-                            color: const Color(0xFF5D4037),
+                            color: AppColors.verdeSecundario,
                             onPressed: _dejarConductor,
                           ),
                         const SizedBox(height: 12),
                         _boton(
                           label: 'Historial de viajes',
-                          color: const Color(0xFF1565C0),
+                          color: AppColors.conductor,
                           onPressed: _irHistorial,
                         ),
                         const SizedBox(height: 12),
@@ -390,13 +394,13 @@ class _PerfilPageState extends State<PerfilPage> {
                         const SizedBox(height: 12),
                         _boton(
                           label: 'Inhabilitar cuenta',
-                          color: Colors.orange,
+                          color: AppColors.warning,
                           onPressed: _inhabilitarCuenta,
                         ),
                         const SizedBox(height: 12),
                         _boton(
                           label: 'Eliminar cuenta',
-                          color: Colors.red.shade700,
+                          color: AppColors.error,
                           onPressed: _eliminarCuenta,
                         ),
                         const SizedBox(height: 32),
@@ -411,7 +415,7 @@ class _PerfilPageState extends State<PerfilPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Material(
-        color: const Color(0xFFE8F5E9),
+        color: AppColors.surfaceGreen,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: _irRegistroConductor,
@@ -424,14 +428,14 @@ class _PerfilPageState extends State<PerfilPage> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    '¿Quieres ser parte nuestra?',
+                    '¿Quieres ser conductor en GoPoli?',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppColors.verdePrimario,
                     ),
                   ),
                 ),
-                Icon(Icons.chevron_right, color: Colors.green.shade800),
+                Icon(Icons.chevron_right, color: AppColors.conductor),
               ],
             ),
           ),

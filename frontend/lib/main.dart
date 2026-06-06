@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'pages/login_page.dart';
 import 'pages/main_shell.dart';
+import 'theme/app_theme.dart';
+import 'theme/app_colors.dart';
 import 'utils/session_manager.dart';
 
 void main() {
@@ -17,6 +19,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'GoPoli',
+      theme: AppTheme.light,
       home: const _SplashGate(),
     );
   }
@@ -52,7 +55,7 @@ class _SplashGateState extends State<_SplashGate> {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: CircularProgressIndicator(color: Color(0xFF1B5E20)),
+        child: CircularProgressIndicator(color: AppColors.verdePrimario),
       ),
     );
   }

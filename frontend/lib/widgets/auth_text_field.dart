@@ -49,7 +49,7 @@ class AuthTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+        hintStyle: const TextStyle(color: AppColors.hint),
         prefixIcon:
             prefixIcon != null ? Icon(prefixIcon, color: AppColors.grisTexto) : null,
         suffixIcon: suffixIcon,
@@ -62,10 +62,10 @@ class AuthTextField extends StatelessWidget {
               const BorderSide(color: AppColors.verdePrimario, width: 2),
         ),
         errorBorder: border.copyWith(
-          borderSide: const BorderSide(color: Colors.red),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
         focusedErrorBorder: border.copyWith(
-          borderSide: const BorderSide(color: Colors.red, width: 2),
+          borderSide: const BorderSide(color: AppColors.error, width: 2),
         ),
       ),
     );

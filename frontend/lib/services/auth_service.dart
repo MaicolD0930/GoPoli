@@ -39,7 +39,7 @@ class AuthService {
               ),
             ),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(Config.apiTimeout);
 
       if (response.statusCode == 200) {
         return Usuario.fromJson(
@@ -71,7 +71,7 @@ class AuthService {
               'contrasena': contrasena,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(Config.apiTimeout);
 
       if (response.statusCode == 200) {
         final login = LoginResponse.fromJson(

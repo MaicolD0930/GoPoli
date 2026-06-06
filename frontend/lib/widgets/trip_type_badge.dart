@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class TripTypeBadge extends StatelessWidget {
   const TripTypeBadge({
     super.key,
@@ -26,9 +28,9 @@ class TripTypeBadge extends StatelessWidget {
         ? (idTipoServicio as num).toInt()
         : int.tryParse(idTipoServicio?.toString() ?? '');
     if (id == 3 || _label.toLowerCase().contains('conductor')) {
-      return const Color(0xFF1565C0);
+      return AppColors.conductor;
     }
-    return const Color(0xFF1B5E20);
+    return AppColors.verdePrimario;
   }
 
   @override

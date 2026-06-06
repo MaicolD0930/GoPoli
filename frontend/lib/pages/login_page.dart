@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
+import '../config/config.dart';
 import '../core/api_exception.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/session_manager.dart';
 import 'main_shell.dart';
+import 'registro_conductor_page.dart';
 import 'registro_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -20,16 +24,34 @@ class _LoginPageState extends State<LoginPage> {
   String mensaje = "";
   bool cargando = false;
   bool verContrasena = false;
+  bool despertandoServidor = false;
 
   final _authService = const AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _despertarServidor();
+  }
+
+  Future<void> _despertarServidor() async {
+    setState(() => despertandoServidor = true);
+    try {
+      await http
+          .get(Uri.parse('${Config.apiUrl}/ubicaciones'))
+          .timeout(Config.apiTimeout);
+    } catch (_) {
+      // El login reintentará; Render free puede tardar en despertar.
+    } finally {
+      if (mounted) setState(() => despertandoServidor = false);
+    }
+  }
 
   Future<void> login() async {
     setState(() {
       cargando = true;
       mensaje = "";
     });
-
-    final navigator = Navigator.of(context);
 
     try {
       await _authService.login(
@@ -38,9 +60,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!context.mounted) return;
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainShell()),
-      );
+      await _navegarTrasLogin();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => mensaje = e.message);
@@ -50,6 +70,58 @@ class _LoginPageState extends State<LoginPage> {
     } finally {
       if (mounted) setState(() => cargando = false);
     }
+  }
+
+  Future<void> _navegarTrasLogin() async {
+    if (SessionManager.esConductor ||
+        await SessionManager.rolConductorYaElegido()) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final quiereConductor = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Quieres ser conductor?'),
+        content: const Text(
+          'Puedes ofrecer viajes compartidos registrando tu vehículo, '
+          'o continuar solo como pasajero.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Solo pasajero'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Sí, registrar vehículo',
+              style: TextStyle(color: AppColors.verdePrimario),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    await SessionManager.marcarRolConductorElegido();
+
+    if (!mounted) return;
+    if (quiereConductor == true) {
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const RegistroConductorPage()),
+      );
+      if (!mounted) return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+    );
   }
 
   @override
@@ -104,18 +176,18 @@ class _LoginPageState extends State<LoginPage> {
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   hintText: 'email@elpoli.edu.co',
-                  hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+                  hintStyle: const TextStyle(color: AppColors.hint),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 16,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    borderSide: const BorderSide(color: AppColors.bordeCampo),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    borderSide: const BorderSide(color: AppColors.bordeCampo),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -135,7 +207,7 @@ class _LoginPageState extends State<LoginPage> {
                 obscureText: !verContrasena,
                 decoration: InputDecoration(
                   hintText: 'Password',
-                  hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+                  hintStyle: const TextStyle(color: AppColors.hint),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 16,
@@ -150,11 +222,11 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    borderSide: const BorderSide(color: AppColors.bordeCampo),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    borderSide: const BorderSide(color: AppColors.bordeCampo),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -167,6 +239,16 @@ class _LoginPageState extends State<LoginPage> {
               ),
 
               const SizedBox(height: 24),
+
+              if (despertandoServidor)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Conectando con el servidor (puede tardar ~1 min)...',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.grisTexto, fontSize: 13),
+                  ),
+                ),
 
               // Botón continuar
               SizedBox(
@@ -211,7 +293,7 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(
                     color: mensaje.startsWith('Bienvenido')
                         ? AppColors.verdeSecundario
-                        : Colors.red,
+                        : AppColors.error,
                     fontSize: 14,
                   ),
                 ),
@@ -243,62 +325,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ],
-              ),
-
-              const SizedBox(height: 28),
-
-              // Separador
-              Row(
-                children: [
-                  const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'O',
-                      style: TextStyle(color: AppColors.grisTexto, fontSize: 13),
-                    ),
-                  ),
-                  const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // Botón Google
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Google Sign In - implementar después
-                  },
-                  icon: Image.network(
-                    'https://www.google.com/favicon.ico',
-                    width: 20,
-                    height: 20,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.g_mobiledata,
-                      color: Colors.blue,
-                      size: 24,
-                    ),
-                  ),
-                  label: const Text(
-                    'Continuar con Google',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: AppColors.verdePrimario,
-                    foregroundColor: Colors.white,
-                    side: BorderSide.none,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
               ),
 
               const SizedBox(height: 28),

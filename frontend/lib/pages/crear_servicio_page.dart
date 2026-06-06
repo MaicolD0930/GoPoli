@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../widgets/crear_servicio_form.dart';
 import 'grupo_page.dart';
 
@@ -10,20 +11,13 @@ class CrearServicioPage extends StatefulWidget {
 }
 
 class _CrearServicioPageState extends State<CrearServicioPage> {
-  static const Color verdePrimario = Color(0xFF1B5E20);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Crear Servicio',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: verdePrimario,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
+        title: const Text('Crear Servicio'),
+        backgroundColor: AppColors.verdePrimario,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

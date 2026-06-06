@@ -13,7 +13,7 @@ class CatalogoService {
     try {
       final response = await http
           .get(Uri.parse('${Config.apiUrl}/carreras'))
-          .timeout(const Duration(seconds: 15));
+          .timeout(Config.apiTimeout);
 
       if (response.statusCode != 200) {
         throw ApiException.fromResponse(response.statusCode, response.body);

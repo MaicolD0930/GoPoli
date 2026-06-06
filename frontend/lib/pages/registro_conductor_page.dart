@@ -106,7 +106,7 @@ class _RegistroConductorPageState extends State<RegistroConductorPage> {
 
   void _mostrarError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+      SnackBar(content: Text(msg), backgroundColor: AppColors.error),
     );
   }
 

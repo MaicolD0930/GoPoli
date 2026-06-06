@@ -15,6 +15,7 @@ import com.proyect.gopoli.dto.UsuarioDto;
 import com.proyect.gopoli.model.GoPoliConstants;
 import com.proyect.gopoli.model.Servicio;
 import com.proyect.gopoli.model.ServicioUsuario;
+import com.proyect.gopoli.model.ServicioUsuarioId;
 import com.proyect.gopoli.model.Ubicacion;
 import com.proyect.gopoli.model.Usuario;
 import com.proyect.gopoli.model.UsuarioEstado;
@@ -24,7 +25,7 @@ import com.proyect.gopoli.repository.ServicioUsuarioRepository;
 import com.proyect.gopoli.repository.UbicacionRepository;
 import com.proyect.gopoli.repository.UsuarioRepository;
 import com.proyect.gopoli.repository.VehiculoRepository;
-import com.proyect.gopoli.security.JwtService;
+import com.proyect.gopoli.security.JwtAuthSupport;
 import com.proyect.gopoli.util.VehicleValidator;
 
 @RestController
@@ -39,7 +40,7 @@ public class UsuarioController {
     private VehiculoRepository vehiculoRepo;
 
     @Autowired
-    private JwtService jwtService;
+    private JwtAuthSupport authSupport;
 
     @Autowired
     private ServicioUsuarioRepository servicioUsuarioRepo;
@@ -51,15 +52,11 @@ public class UsuarioController {
     private UbicacionRepository ubicacionRepo;
 
     private Optional<Usuario> usuarioAutenticado(String authorization) {
-        Integer id = jwtService.parseUserId(authorization);
-        if (id == null) {
-            return Optional.empty();
-        }
-        return repo.findById(id);
+        return authSupport.usuarioFromAuth(authorization);
     }
 
     private ResponseEntity<?> noAutorizado() {
-        return ResponseEntity.status(401).body("Token inválido o ausente");
+        return authSupport.unauthorized();
     }
 
     private UsuarioDto dtoConVehiculo(Usuario usuario) {
@@ -302,6 +299,80 @@ public class UsuarioController {
             return "Conductor";
         }
         return "Pasajero";
+    }
+
+    @PostMapping("/{idUsuario}/calificar")
+    public ResponseEntity<?> calificarUsuario(
+            @PathVariable Integer idUsuario,
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "Authorization", required = false) String auth) {
+        Optional<Usuario> calificadorOpt = usuarioAutenticado(auth);
+        if (calificadorOpt.isEmpty()) {
+            return noAutorizado();
+        }
+        Usuario calificador = calificadorOpt.get();
+        if (calificador.getIdUsuario().equals(idUsuario)) {
+            return ResponseEntity.status(400).body("No puedes calificarte a ti mismo");
+        }
+
+        Object rawServicio = body.get("idServicio");
+        if (rawServicio == null) {
+            return ResponseEntity.status(400).body("El idServicio es obligatorio");
+        }
+        Integer idServicio;
+        try {
+            idServicio = rawServicio instanceof Number
+                    ? ((Number) rawServicio).intValue()
+                    : Integer.parseInt(rawServicio.toString());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(400).body("idServicio inválido");
+        }
+
+        Optional<Servicio> servicioOpt = servicioRepo.findById(idServicio);
+        if (servicioOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Viaje no encontrado");
+        }
+        Servicio servicio = servicioOpt.get();
+        if (servicio.getIdEstadoServicio() == null
+                || servicio.getIdEstadoServicio() != GoPoliConstants.ESTADO_SERVICIO_FINALIZADO) {
+            return ResponseEntity.status(400).body("Solo puedes calificar tras un viaje finalizado");
+        }
+
+        ServicioUsuarioId idCalificador = new ServicioUsuarioId(idServicio, calificador.getIdUsuario());
+        ServicioUsuarioId idObjetivo = new ServicioUsuarioId(idServicio, idUsuario);
+        if (servicioUsuarioRepo.findById(idCalificador).isEmpty()
+                || servicioUsuarioRepo.findById(idObjetivo).isEmpty()) {
+            return ResponseEntity.status(403).body("No compartiste este viaje con ese usuario");
+        }
+
+        Object raw = body.get("puntuacion");
+        if (raw == null) {
+            return ResponseEntity.status(400).body("La puntuación es obligatoria");
+        }
+        double puntuacion;
+        try {
+            puntuacion = raw instanceof Number ? ((Number) raw).doubleValue() : Double.parseDouble(raw.toString());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(400).body("Puntuación inválida");
+        }
+        if (puntuacion < 1 || puntuacion > 5) {
+            return ResponseEntity.status(400).body("La puntuación debe estar entre 1 y 5");
+        }
+
+        Optional<Usuario> objetivoOpt = repo.findById(idUsuario);
+        if (objetivoOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Usuario no encontrado");
+        }
+        Usuario objetivo = objetivoOpt.get();
+
+        double actual = objetivo.getNota() != null ? objetivo.getNota() : 0.0;
+        double nuevaNota = actual <= 0 ? puntuacion : (actual + puntuacion) / 2.0;
+        objetivo.setNota(Math.round(nuevaNota * 10.0) / 10.0);
+        repo.save(objetivo);
+
+        return ResponseEntity.ok(Map.of(
+                "idUsuario", objetivo.getIdUsuario(),
+                "nota", objetivo.getNota()));
     }
 
     @PostMapping("/me/inhabilitar")

@@ -7,7 +7,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../config/config.dart';
+import '../core/api_client.dart';
 import '../services/route_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/session_manager.dart';
 import '../widgets/crear_servicio_form.dart';
 import 'grupo_page.dart';
@@ -45,9 +47,6 @@ class InicioMapaPage extends StatefulWidget {
 }
 
 class _InicioMapaPageState extends State<InicioMapaPage> {
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-
   static const LatLng _centroMedellin = LatLng(6.2476, -75.5658);
 
   final _destinoQuery = ValueNotifier<String>('');
@@ -144,6 +143,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
         Uri.parse(
           '${Config.apiUrl}/servicio/usuario/activo/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -153,6 +153,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
           Uri.parse(
             '${Config.apiUrl}/servicio/usuario/miembro/${SessionManager.idUsuario}',
           ),
+          headers: ApiClient.jsonHeaders(),
         );
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -166,6 +167,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
         Uri.parse(
           '${Config.apiUrl}/servicio/usuario/encurso/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -248,7 +250,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
           Polyline(
             polylineId: const PolylineId('ruta'),
             points: ruta,
-            color: verdePrimario,
+            color: AppColors.verdePrimario,
             width: 5,
           ),
         };
@@ -349,7 +351,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
   Widget _buildMapa() {
     if (!_googleMapsConfigurado) {
       return Container(
-        color: const Color(0xFFE8F5E9),
+        color: AppColors.surfaceGreen,
         alignment: Alignment.center,
         padding: const EdgeInsets.all(24),
         child: const Text(
@@ -360,7 +362,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
           '4. Reinicia la app (flutter run)\n\n'
           'Guía: frontend/README_MAPS_ES.md',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFF1B5E20), height: 1.4),
+          style: TextStyle(color: AppColors.verdePrimario, height: 1.4),
         ),
       );
     }
@@ -401,7 +403,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                   child: Material(
-                    color: verdeSecundario,
+                    color: AppColors.verdeSecundario,
                     borderRadius: BorderRadius.circular(10),
                     child: Row(
                       children: [
@@ -446,7 +448,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                   child: Material(
-                    color: verdePrimario,
+                    color: AppColors.verdePrimario,
                     borderRadius: BorderRadius.circular(10),
                     child: InkWell(
                       onTap: () => _abrirGrupo(_idServicioActivo!),
@@ -486,7 +488,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                     decoration: InputDecoration(
                       hintText: '¿A dónde vamos?',
                       prefixIcon:
-                          const Icon(Icons.search, color: verdePrimario),
+                          const Icon(Icons.search, color: AppColors.verdePrimario),
                       suffixIcon: _busquedaController.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear),
@@ -553,7 +555,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: AppColors.bordeCampo,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -563,10 +565,10 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: verdePrimario.withValues(alpha: 0.1),
+                          color: AppColors.verdePrimario.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.add_road, color: verdePrimario),
+                        child: const Icon(Icons.add_road, color: AppColors.verdePrimario),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -575,7 +577,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: verdePrimario,
+                            color: AppColors.verdePrimario,
                           ),
                         ),
                       ),
@@ -584,7 +586,7 @@ class _InicioMapaPageState extends State<InicioMapaPage> {
                   const SizedBox(height: 8),
                   Text(
                     'Elige salida y destino: la ruta en el mapa usa las coordenadas del servidor.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.35),
+                    style: TextStyle(fontSize: 13, color: AppColors.grisTexto, height: 1.35),
                   ),
                   const SizedBox(height: 16),
                       CrearServicioForm(

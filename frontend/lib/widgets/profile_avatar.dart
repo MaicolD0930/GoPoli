@@ -34,8 +34,12 @@ class ProfileAvatar extends StatelessWidget {
     } else {
       child = CircleAvatar(
         radius: radius,
-        backgroundColor: const Color(0xFFFFE0B2),
-        child: Icon(Icons.person, size: radius * 1.4, color: const Color(0xFFBCAAA4)),
+        backgroundColor: AppColors.verdePrimario.withValues(alpha: 0.12),
+        child: Icon(
+          Icons.person,
+          size: radius * 1.4,
+          color: AppColors.verdeSecundario,
+        ),
       );
     }
 

@@ -3,6 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:convert';
 import '../config/config.dart';
+import '../core/api_client.dart';
+import '../services/usuario_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/session_manager.dart';
 
 class GrupoPage extends StatefulWidget {
@@ -15,9 +18,8 @@ class GrupoPage extends StatefulWidget {
 }
 
 class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color grisTexto = Color(0xFF757575);
   static const Duration _intervaloAutoRefresh = Duration(seconds: 5);
+  final _usuarioService = const UsuarioService();
 
   List<dynamic> miembros = [];
   bool cargando = true;
@@ -170,7 +172,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'Sí, cancelar',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.error),
             ),
           ),
         ],
@@ -182,6 +184,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
     try {
       final res = await http.put(
         Uri.parse('${Config.apiUrl}/servicio/cancelar/${widget.idServicio}'),
+        headers: ApiClient.jsonHeaders(),
       );
       if (!mounted) return;
       if (res.statusCode == 200) {
@@ -215,7 +218,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'Sí, iniciar',
-              style: TextStyle(color: Color(0xFF1B5E20)),
+              style: TextStyle(color: AppColors.verdePrimario),
             ),
           ),
         ],
@@ -227,6 +230,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
     try {
       final res = await http.put(
         Uri.parse('${Config.apiUrl}/servicio/iniciar/${widget.idServicio}'),
+        headers: ApiClient.jsonHeaders(),
       );
       if (!mounted) return;
       if (res.statusCode == 200) {
@@ -263,7 +267,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'Sí, finalizar',
-              style: TextStyle(color: Color(0xFF1B5E20)),
+              style: TextStyle(color: AppColors.verdePrimario),
             ),
           ),
         ],
@@ -275,9 +279,12 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
     try {
       final res = await http.put(
         Uri.parse('${Config.apiUrl}/servicio/finalizar/${widget.idServicio}'),
+        headers: ApiClient.jsonHeaders(),
       );
       if (!mounted) return;
       if (res.statusCode == 200) {
+        await _mostrarCalificaciones();
+        if (!mounted) return;
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -289,6 +296,68 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error al finalizar el viaje')),
         );
+      }
+    }
+  }
+
+  Future<void> _mostrarCalificaciones() async {
+    final otros = miembros
+        .where((m) => !_mismoUsuario(m['idUsuario'], SessionManager.idUsuario))
+        .toList();
+    if (otros.isEmpty) return;
+
+    for (final m in otros) {
+      if (!mounted) return;
+      final rawId = m['idUsuario'];
+      final id = rawId is num
+          ? rawId.toInt()
+          : int.tryParse(rawId?.toString() ?? '');
+      if (id == null) continue;
+
+      final nombre = m['nombreUsuario']?.toString() ?? 'Compañero';
+      final puntos = await showDialog<int>(
+        context: context,
+        builder: (ctx) {
+          int seleccion = 5;
+          return StatefulBuilder(
+            builder: (context, setLocal) => AlertDialog(
+              title: Text('Calificar a $nombre'),
+              content: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  final star = i + 1;
+                  return IconButton(
+                    onPressed: () => setLocal(() => seleccion = star),
+                    icon: Icon(
+                      star <= seleccion ? Icons.star : Icons.star_border,
+                      color: AppColors.amarillo,
+                    ),
+                  );
+                }),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Omitir'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, seleccion),
+                  child: const Text('Enviar'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (puntos != null) {
+        try {
+          await _usuarioService.calificarUsuario(
+            idUsuario: id,
+            idServicio: widget.idServicio,
+            puntuacion: puntos,
+          );
+        } catch (_) {}
       }
     }
   }
@@ -306,7 +375,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sí, salir', style: TextStyle(color: Colors.red)),
+            child: const Text('Sí, salir', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -319,6 +388,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
         Uri.parse(
           '${Config.apiUrl}/servicio/salir/${widget.idServicio}/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (!mounted) return;
       if (res.statusCode == 200) {
@@ -352,7 +422,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
           'Mi grupo',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: verdePrimario,
+        backgroundColor: AppColors.verdePrimario,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
@@ -385,12 +455,12 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off_outlined, size: 56, color: Colors.grey[400]),
+            Icon(Icons.cloud_off_outlined, size: 56, color: AppColors.grisTexto),
             const SizedBox(height: 16),
             Text(
               _errorMiembros!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: grisTexto, fontSize: 15),
+              style: const TextStyle(color: AppColors.grisTexto, fontSize: 15),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
@@ -398,7 +468,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
               icon: const Icon(Icons.refresh),
               label: const Text('Reintentar'),
               style: FilledButton.styleFrom(
-                backgroundColor: verdePrimario,
+                backgroundColor: AppColors.verdePrimario,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -411,7 +481,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
   Widget _buildListaMiembros() {
     if (miembros.isEmpty) {
       return RefreshIndicator(
-        color: verdePrimario,
+        color: AppColors.verdePrimario,
         onRefresh: () => _cargarTodo(),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -425,12 +495,12 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.group_outlined, size: 56, color: Colors.grey[400]),
+                        Icon(Icons.group_outlined, size: 56, color: AppColors.grisTexto),
                         const SizedBox(height: 12),
                         Text(
                           'Aún no hay personas en este grupo',
                           style: TextStyle(
-                            color: Colors.grey[700],
+                            color: AppColors.grisTexto,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -439,7 +509,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
                         const SizedBox(height: 8),
                         Text(
                           'Desliza hacia abajo para actualizar o pulsa el ícono de actualizar.',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          style: TextStyle(color: AppColors.grisTexto, fontSize: 13),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -454,7 +524,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
     }
 
     return RefreshIndicator(
-      color: verdePrimario,
+      color: AppColors.verdePrimario,
       onRefresh: () => _cargarTodo(),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -467,21 +537,21 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
             elevation: 0,
-            color: soyYo ? const Color(0xFFE8F5E9) : Colors.grey[50],
+            color: soyYo ? AppColors.surfaceGreen : AppColors.surfaceMuted,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
-                color: soyYo ? verdePrimario.withValues(alpha: 0.35) : const Color(0xFFEEEEEE),
+                color: soyYo ? AppColors.verdePrimario.withValues(alpha: 0.35) : AppColors.divider,
               ),
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               leading: CircleAvatar(
                 backgroundColor:
-                    esCreadorMiembro ? verdePrimario : Colors.grey[300],
+                    esCreadorMiembro ? AppColors.verdePrimario : AppColors.bordeCampo,
                 child: Icon(
                   Icons.person,
-                  color: esCreadorMiembro ? Colors.white : grisTexto,
+                  color: esCreadorMiembro ? Colors.white : AppColors.grisTexto,
                 ),
               ),
               title: Row(
@@ -496,7 +566,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: verdePrimario,
+                        color: AppColors.verdePrimario,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
@@ -513,7 +583,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
               subtitle: Text(
                 _etiquetaMiembro(miembro, esCreadorMiembro),
                 style: TextStyle(
-                  color: esCreadorMiembro ? verdePrimario : grisTexto,
+                  color: esCreadorMiembro ? AppColors.verdePrimario : AppColors.grisTexto,
                   fontSize: 12,
                 ),
               ),
@@ -545,7 +615,7 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: verdePrimario,
+                backgroundColor: AppColors.verdePrimario,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -562,17 +632,17 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
               height: 52,
               child: OutlinedButton.icon(
                 onPressed: _cancelarGrupo,
-                icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                icon: const Icon(Icons.cancel_outlined, color: AppColors.error),
                 label: const Text(
                   'Cancelar grupo',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.red,
+                    color: AppColors.error,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
+                  side: const BorderSide(color: AppColors.error),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -593,17 +663,17 @@ class _GrupoPageState extends State<GrupoPage> with WidgetsBindingObserver {
         height: 52,
         child: OutlinedButton.icon(
           onPressed: _salirGrupo,
-          icon: const Icon(Icons.exit_to_app, color: Colors.red),
+          icon: const Icon(Icons.exit_to_app, color: AppColors.error),
           label: const Text(
             'Salir del grupo',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.red,
+              color: AppColors.error,
             ),
           ),
           style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Colors.red),
+            side: const BorderSide(color: AppColors.error),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),

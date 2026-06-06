@@ -11,7 +11,9 @@ import com.proyect.gopoli.dto.LoginResponse;
 import com.proyect.gopoli.dto.UsuarioDto;
 import com.proyect.gopoli.model.Usuario;
 import com.proyect.gopoli.model.UsuarioEstado;
+import com.proyect.gopoli.model.Vehiculo;
 import com.proyect.gopoli.repository.UsuarioRepository;
+import com.proyect.gopoli.repository.VehiculoRepository;
 import com.proyect.gopoli.security.JwtService;
 
 @RestController
@@ -23,6 +25,9 @@ public class AuthController {
 
     @Autowired
     JwtService jwtService;
+
+    @Autowired
+    VehiculoRepository vehiculoRepo;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Usuario usuario) {
@@ -61,6 +66,7 @@ public class AuthController {
         }
 
         String token = jwtService.generateToken(u.getIdUsuario());
-        return ResponseEntity.ok(new LoginResponse(token, UsuarioDto.from(u)));
+        Vehiculo vehiculo = vehiculoRepo.findByIdUsuario(u.getIdUsuario()).orElse(null);
+        return ResponseEntity.ok(new LoginResponse(token, UsuarioDto.from(u, vehiculo)));
     }
 }

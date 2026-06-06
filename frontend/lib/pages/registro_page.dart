@@ -88,7 +88,7 @@ class _RegistroPageState extends State<RegistroPage> {
       SnackBar(
         content: Text(mensaje),
         backgroundColor:
-            error ? Colors.red.shade700 : AppColors.verdeSecundario,
+            error ? AppColors.error : AppColors.verdeSecundario,
       ),
     );
   }
@@ -290,7 +290,7 @@ class _RegistroPageState extends State<RegistroPage> {
                   Text(
                     _mensajeGlobal!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 14),
+                    style: const TextStyle(color: AppColors.error, fontSize: 14),
                   ),
                 ],
                 const SizedBox(height: 24),
@@ -376,7 +376,7 @@ class _RegistroPageState extends State<RegistroPage> {
         children: [
           Text(
             _errorCarreras!,
-            style: const TextStyle(color: Colors.red, fontSize: 13),
+            style: const TextStyle(color: AppColors.error, fontSize: 13),
           ),
           TextButton(onPressed: _cargarCarreras, child: const Text('Reintentar')),
         ],

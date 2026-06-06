@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/config.dart';
+import '../core/api_client.dart';
+import '../theme/app_colors.dart';
 import '../utils/session_manager.dart';
 import '../pages/crear_servicio_page.dart';
 import '../pages/grupo_page.dart';
@@ -36,9 +38,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const Color verdePrimario = Color(0xFF1B5E20);
-  static const Color verdeSecundario = Color(0xFF2E7D32);
-
   List servicios = [];
   bool cargando = true;
   int? idServicioActivo;
@@ -98,6 +97,7 @@ class _HomePageState extends State<HomePage> {
         Uri.parse(
           '${Config.apiUrl}/servicio/usuario/activo/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -108,6 +108,7 @@ class _HomePageState extends State<HomePage> {
           Uri.parse(
             '${Config.apiUrl}/servicio/usuario/miembro/${SessionManager.idUsuario}',
           ),
+          headers: ApiClient.jsonHeaders(),
         );
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -128,6 +129,7 @@ class _HomePageState extends State<HomePage> {
         Uri.parse(
           '${Config.apiUrl}/servicio/usuario/encurso/${SessionManager.idUsuario}',
         ),
+        headers: ApiClient.jsonHeaders(),
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -146,11 +148,8 @@ class _HomePageState extends State<HomePage> {
     try {
       final res = await http.post(
         Uri.parse('${Config.apiUrl}/servicio/unirse'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'idServicio': idServicio,
-          'idUsuario': SessionManager.idUsuario,
-        }),
+        headers: ApiClient.jsonHeaders(withAuth: true),
+        body: jsonEncode({'idServicio': idServicio}),
       );
 
       if (res.statusCode == 200) {
@@ -189,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                   fontSize: 22,
                 ),
               ),
-              backgroundColor: verdePrimario,
+              backgroundColor: AppColors.verdePrimario,
               elevation: 0,
               automaticallyImplyLeading: false,
               actions: [
@@ -210,7 +209,7 @@ class _HomePageState extends State<HomePage> {
           // Banner viaje en curso
           if (idServicioEnCurso != null)
             Material(
-              color: const Color(0xFF2E7D32),
+              color: AppColors.verdeSecundario,
               child: InkWell(
                 onTap: () =>
                     widget.onIrAMapaViaje?.call(idServicioEnCurso!),
@@ -246,7 +245,7 @@ class _HomePageState extends State<HomePage> {
                 ? const Center(child: CircularProgressIndicator())
                 : servicios.isEmpty
                 ? RefreshIndicator(
-                    color: verdePrimario,
+                    color: AppColors.verdePrimario,
                     onRefresh: _cargarTodo,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
@@ -263,13 +262,13 @@ class _HomePageState extends State<HomePage> {
                                   Icon(
                                     Icons.group_off,
                                     size: 64,
-                                    color: Colors.grey[300],
+                                    color: AppColors.bordeCampo,
                                   ),
                                   const SizedBox(height: 16),
                                   const Text(
                                     'No hay servicios activos',
                                     style: TextStyle(
-                                      color: Color(0xFF757575),
+                                      color: AppColors.grisTexto,
                                       fontSize: 16,
                                     ),
                                   ),
@@ -277,7 +276,7 @@ class _HomePageState extends State<HomePage> {
                                   const Text(
                                     '¡Crea el primero!',
                                     style: TextStyle(
-                                      color: Color(0xFF757575),
+                                      color: AppColors.grisTexto,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -286,7 +285,7 @@ class _HomePageState extends State<HomePage> {
                                     'Desliza hacia abajo para actualizar',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: Colors.grey[500],
+                                      color: AppColors.grisTexto,
                                     ),
                                   ),
                                 ],
@@ -299,7 +298,7 @@ class _HomePageState extends State<HomePage> {
                   )
                 : RefreshIndicator(
                     onRefresh: _cargarTodo,
-                    color: verdePrimario,
+                    color: AppColors.verdePrimario,
                     child: ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
@@ -327,13 +326,13 @@ class _HomePageState extends State<HomePage> {
                                     const Icon(
                                       Icons.calendar_today,
                                       size: 14,
-                                      color: Color(0xFF757575),
+                                      color: AppColors.grisTexto,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
                                       '${s['fecha']} - ${s['horaSalida']}',
                                       style: const TextStyle(
-                                        color: Color(0xFF757575),
+                                        color: AppColors.grisTexto,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -355,7 +354,7 @@ class _HomePageState extends State<HomePage> {
                                   child: ElevatedButton(
                                     onPressed: () => _unirse(s['idServicio']),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: verdePrimario,
+                                      backgroundColor: AppColors.verdePrimario,
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
@@ -391,7 +390,7 @@ class _HomePageState extends State<HomePage> {
         heroTag: 'fab_viaje_curso',
         onPressed: () =>
             widget.onIrAMapaViaje?.call(idServicioEnCurso!),
-        backgroundColor: verdeSecundario,
+        backgroundColor: AppColors.verdeSecundario,
         icon: const Icon(Icons.map, color: Colors.white),
         label: const Text(
           'Ver ruta del viaje',
@@ -423,7 +422,7 @@ class _HomePageState extends State<HomePage> {
                 _pingOtrasPestanas();
               }
             },
-            backgroundColor: verdeSecundario,
+            backgroundColor: AppColors.verdeSecundario,
             icon: const Icon(Icons.group, color: Colors.white),
             label: const Text(
               'Ver mi grupo',
@@ -441,7 +440,7 @@ class _HomePageState extends State<HomePage> {
               heroTag: 'fab_mapa',
               tooltip: 'Ir al mapa (inicio)',
               onPressed: irInicio,
-              backgroundColor: verdePrimario,
+              backgroundColor: AppColors.verdePrimario,
               child: const Icon(Icons.map, color: Colors.white),
             ),
           ],
@@ -466,7 +465,7 @@ class _HomePageState extends State<HomePage> {
           _pingOtrasPestanas();
         }
       },
-      backgroundColor: verdePrimario,
+      backgroundColor: AppColors.verdePrimario,
       icon: const Icon(Icons.add, color: Colors.white),
       label: const Text(
         'Crear servicio',
