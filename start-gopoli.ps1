@@ -1,4 +1,4 @@
-# Inicia PostgreSQL (Docker), backend Spring Boot y frontend Flutter.
+# Inicia PostgreSQL (Docker), backend Spring Boot y PWA Next.js (web/).
 #
 # Si PowerShell bloquea scripts, NO ejecutes este archivo directo.
 # Usa una de estas opciones:
@@ -19,31 +19,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = $PSScriptRoot
 $BackendDir = Join-Path $RepoRoot 'backend'
-$FrontendDir = Join-Path $RepoRoot 'frontend'
+$WebDir = Join-Path $RepoRoot 'web'
 $ApiUrl = 'http://localhost:8080'
-$DbPort = 5433
+$WebUrl = 'http://localhost:3000'
+$DbPort = 5432
 $DockerName = 'gopoli-postgres'
 
 function Write-Step {
     param([string]$Tag, [string]$Message, [string]$Color = 'White')
     Write-Host "[$Tag] $Message" -ForegroundColor $Color
-}
-
-function Resolve-Flutter {
-    if ($env:FLUTTER_ROOT -and (Test-Path (Join-Path $env:FLUTTER_ROOT 'bin\flutter.bat'))) {
-        return Join-Path $env:FLUTTER_ROOT 'bin\flutter.bat'
-    }
-    $candidates = @(
-        (Join-Path $env:USERPROFILE 'flutter\bin\flutter.bat'),
-        'C:\flutter\bin\flutter.bat',
-        'C:\src\flutter\bin\flutter.bat'
-    )
-    foreach ($path in $candidates) {
-        if (Test-Path $path) { return $path }
-    }
-    $cmd = Get-Command flutter -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-    throw 'No se encontro Flutter. Instalalo o define FLUTTER_ROOT (ej. C:\Users\maico\flutter).'
 }
 
 function Resolve-BrowserExecutable {
@@ -81,6 +65,15 @@ function Test-BackendReady {
     }
 }
 
+function Test-WebReady {
+    try {
+        $null = Invoke-WebRequest -Uri $WebUrl -UseBasicParsing -TimeoutSec 3
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 function Start-PostgresDocker {
     $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
     if (-not $dockerCmd) {
@@ -89,30 +82,16 @@ function Start-PostgresDocker {
 
     $running = docker ps --filter "name=$DockerName" --filter "status=running" -q 2>$null
     if ($running) {
-        Write-Step 'DB' 'Contenedor gopoli-postgres ya esta en ejecucion.' 'Green'
+        $published = docker ps --filter "name=$DockerName" --filter "status=running" --format '{{.Ports}}'
+        Write-Step 'DB' "Contenedor gopoli-postgres ya esta en ejecucion ($published)." 'Green'
         return
     }
 
     $exists = docker ps -a --filter "name=$DockerName" -q 2>$null
     if (-not $exists) {
-        Write-Step 'DB' "Creando PostgreSQL en puerto $DbPort..." 'Cyan'
-        docker run -d --name $DockerName `
-            -e POSTGRES_USER=postgres `
-            -e POSTGRES_PASSWORD=123456789 `
-            -e POSTGRES_DB=gopoli `
-            -p "${DbPort}:5432" `
-            postgres:16-alpine | Out-Null
+        Write-Step 'DB' "Creando PostgreSQL en puerto $DbPort (docker compose)..." 'Cyan'
+        docker compose up -d
         Start-Sleep -Seconds 5
-
-        if (-not $SkipDbRestore) {
-            $dump = Join-Path $RepoRoot 'gopoli.dump'
-            $pgRestore = 'C:\Program Files\PostgreSQL\18\bin\pg_restore.exe'
-            if ((Test-Path $dump) -and (Test-Path $pgRestore)) {
-                Write-Step 'DB' 'Restaurando gopoli.dump...' 'Cyan'
-                $env:PGPASSWORD = '123456789'
-                & $pgRestore --no-owner --no-privileges -h localhost -p $DbPort -U postgres -d gopoli $dump 2>&1 | Out-Null
-            }
-        }
     } else {
         Write-Step 'DB' 'Iniciando contenedor gopoli-postgres...' 'Cyan'
         docker start $DockerName | Out-Null
@@ -136,8 +115,8 @@ function Start-BackendWindow {
 `$host.UI.RawUI.WindowTitle = 'GoPoli Backend'
 Set-Location -LiteralPath '$BackendDir'
 `$env:SPRING_DATASOURCE_URL = 'jdbc:postgresql://localhost:$DbPort/gopoli'
-`$env:SPRING_DATASOURCE_USERNAME = 'postgres'
-`$env:SPRING_DATASOURCE_PASSWORD = '123456789'
+`$env:SPRING_DATASOURCE_USERNAME = 'gopoli'
+`$env:SPRING_DATASOURCE_PASSWORD = 'gopoli'
 Write-Host 'Iniciando Spring Boot en $ApiUrl ...' -ForegroundColor Cyan
 & .\mvnw.cmd spring-boot:run
 "@ | Set-Content -Path $runnerScript -Encoding UTF8
@@ -161,13 +140,70 @@ Write-Host 'Iniciando Spring Boot en $ApiUrl ...' -ForegroundColor Cyan
     throw 'El backend no respondio en 4 minutos. Revisa la ventana GoPoli Backend.'
 }
 
-function Ensure-FrontendConfig {
-    $mapsConfig = Join-Path $FrontendDir 'lib\config\google_maps_config.dart'
-    $mapsExample = Join-Path $FrontendDir 'lib\config\google_maps_config.example.dart'
-    if (-not (Test-Path $mapsConfig)) {
-        Copy-Item $mapsExample $mapsConfig
-        Write-Step 'APP' 'Creado google_maps_config.dart. Agrega tu clave de Google Maps.' 'Yellow'
+function Ensure-WebEnv {
+    if (-not (Test-Path $WebDir)) {
+        throw "No se encontro la carpeta web/ en $RepoRoot"
     }
+
+    $envFile = Join-Path $WebDir '.env'
+    $envExample = Join-Path $WebDir '.env.example'
+    if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
+        Copy-Item $envExample $envFile
+        Write-Step 'WEB' 'Creado web/.env desde .env.example' 'Yellow'
+    }
+}
+
+function Start-WebWindow {
+    if (Test-WebReady) {
+        Write-Step 'WEB' "PWA ya responde en $WebUrl" 'Green'
+        return
+    }
+
+    $npm = Get-Command npm -ErrorAction SilentlyContinue
+    if (-not $npm) {
+        throw 'No se encontro npm. Instala Node.js LTS e intenta de nuevo.'
+    }
+
+    $nodeModules = Join-Path $WebDir 'node_modules'
+    if (-not (Test-Path $nodeModules)) {
+        Write-Step 'WEB' 'Instalando dependencias (npm install)...' 'Cyan'
+        Push-Location $WebDir
+        try {
+            & npm install
+            if ($LASTEXITCODE -ne 0) {
+                throw 'npm install fallo.'
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+
+    $runnerScript = Join-Path $RepoRoot 'scripts\_start-web.ps1'
+    @"
+`$host.UI.RawUI.WindowTitle = 'GoPoli Web'
+Set-Location -LiteralPath '$WebDir'
+Write-Host 'Iniciando Next.js en $WebUrl ...' -ForegroundColor Cyan
+Write-Host 'API esperada: $ApiUrl' -ForegroundColor DarkGray
+& npm run dev
+"@ | Set-Content -Path $runnerScript -Encoding UTF8
+
+    Start-Process powershell -ArgumentList @(
+        '-NoExit',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', $runnerScript
+    ) | Out-Null
+
+    Write-Step 'WEB' 'Ventana de la PWA abierta. Esperando respuesta...' 'Cyan'
+
+    $deadline = (Get-Date).AddMinutes(3)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-WebReady) {
+            Write-Step 'WEB' 'PWA lista.' 'Green'
+            return
+        }
+        Start-Sleep -Seconds 2
+    }
+    throw 'La PWA no respondio en 3 minutos. Revisa la ventana GoPoli Web.'
 }
 
 # --- Main ---
@@ -182,31 +218,15 @@ try {
     }
 
     Start-BackendWindow
-    Ensure-FrontendConfig
+    Ensure-WebEnv
+    Start-WebWindow
 
-    $flutter = Resolve-Flutter
     $browserExe = Resolve-BrowserExecutable -Choice $Browser
-    $flutterDir = Split-Path $flutter -Parent
-    $env:PATH = $flutterDir + ';' + $env:PATH
-    $env:CHROME_EXECUTABLE = $browserExe
-
     $browserName = [System.IO.Path]::GetFileName($browserExe)
-    Write-Step 'APP' "Iniciando Flutter con $browserName ..."
-    Write-Step 'APP' "API: $ApiUrl"
+    Write-Step 'WEB' "Abriendo $WebUrl en $browserName ..."
+    Start-Process -FilePath $browserExe -ArgumentList $WebUrl | Out-Null
 
-    Set-Location $FrontendDir
-
-    $pubResult = & $flutter pub get 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $pubText = $pubResult -join "`n"
-        if ($pubText -match 'symlink') {
-            Write-Step 'APP' 'Activa Modo de desarrollador en Windows (symlinks): start ms-settings:developers' 'Yellow'
-        }
-        Write-Host $pubText
-        throw 'flutter pub get fallo.'
-    }
-
-    & $flutter run -d chrome --dart-define=API_URL=$ApiUrl
+    Write-Step 'OK' "Backend: $ApiUrl | PWA: $WebUrl" 'Green'
 }
 catch {
     Write-Host ''
